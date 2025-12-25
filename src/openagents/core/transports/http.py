@@ -3,6 +3,7 @@ HTTP Transport Implementation for OpenAgents.
 
 This module provides the HTTP transport implementation for agent communication.
 Optionally serves MCP protocol at /mcp and Studio frontend at /studio.
+Optionally connects to relay server for public access without port forwarding.
 """
 
 import asyncio
@@ -16,7 +17,11 @@ import os
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Any, Optional, List, TYPE_CHECKING
+from typing import Dict, Any, Optional, List, Callable, TYPE_CHECKING
+from urllib.parse import urlencode
+
+import aiohttp
+from aiohttp import web
 
 from openagents.config.globals import (
     SYSTEM_EVENT_REGISTER_AGENT,
@@ -24,6 +29,10 @@ from openagents.config.globals import (
     SYSTEM_EVENT_POLL_MESSAGES,
     SYSTEM_EVENT_UNREGISTER_AGENT,
 )
+from openagents.models.network_management import ImportMode
+from openagents.utils.network_export import NetworkExporter
+from openagents.utils.network_import import NetworkImporter
+from io import BytesIO
 from aiohttp import web
 
 # No need for external CORS library, implement manually
@@ -36,6 +45,9 @@ if TYPE_CHECKING:
     from openagents.core.network import AgentNetwork
 
 logger = logging.getLogger(__name__)
+
+# Default relay server URL
+DEFAULT_RELAY_URL = "wss://relay.openagents.org"
 
 # MCP Protocol version (when serve_mcp is enabled)
 MCP_PROTOCOL_VERSION = "2025-03-26"
@@ -75,6 +87,7 @@ class HttpTransport(Transport):
         super().__init__(TransportType.HTTP, config, is_notifiable=False)
         self.app = web.Application(middlewares=[self.cors_middleware])
         self.site = None
+        self.runner = None  # AppRunner instance for proper cleanup
         self.network_instance: Optional["AgentNetwork"] = None  # Reference to network instance
 
         # MCP serving configuration (enabled via serve_mcp: true)
@@ -88,6 +101,30 @@ class HttpTransport(Transport):
         self._studio_build_dir: Optional[str] = None
 
         self.workspace_path = workspace_path  # Workspace path for LLM logs API
+
+        # Relay configuration (enabled via relay: {url: "wss://..."} or relay: true)
+        relay_config = self.config.get("relay", None)
+        if relay_config is True:
+            self._relay_url = DEFAULT_RELAY_URL
+        elif isinstance(relay_config, dict):
+            self._relay_url = relay_config.get("url", DEFAULT_RELAY_URL)
+        elif isinstance(relay_config, str):
+            self._relay_url = relay_config
+        else:
+            self._relay_url = None
+
+        self._relay_ws: Optional[aiohttp.ClientWebSocketResponse] = None
+        self._relay_session: Optional[aiohttp.ClientSession] = None
+        self._relay_tunnel_id: Optional[str] = None
+        self._relay_public_url: Optional[str] = None
+        self._relay_running = False
+        self._relay_task: Optional[asyncio.Task] = None
+        self._relay_heartbeat_task: Optional[asyncio.Task] = None
+
+        # Listen address (set in listen())
+        self._listen_host: str = "0.0.0.0"
+        self._listen_port: int = 8080
+
         self.setup_routes()
 
     def setup_routes(self):
@@ -100,6 +137,11 @@ class HttpTransport(Transport):
         self.app.router.add_post("/api/unregister", self.unregister_agent)
         self.app.router.add_get("/api/poll", self.poll_messages)
         self.app.router.add_post("/api/send_event", self.send_message)
+
+        # Network management endpoints (admin only)
+        self.app.router.add_get("/api/network/export", self.export_network)
+        self.app.router.add_post("/api/network/import/validate", self.validate_import)
+        self.app.router.add_post("/api/network/import/apply", self.apply_import)
         # LLM Logs API endpoints
         self.app.router.add_get("/api/agents/service/{agent_id}/llm-logs", self.get_llm_logs)
         self.app.router.add_get("/api/agents/service/{agent_id}/llm-logs/{log_id}", self.get_llm_log_entry)
@@ -119,6 +161,13 @@ class HttpTransport(Transport):
         self.app.router.add_put("/api/agents/service/{agent_id}/source", self.save_service_agent_source)
         self.app.router.add_get("/api/agents/service/{agent_id}/env", self.get_service_agent_env)
         self.app.router.add_put("/api/agents/service/{agent_id}/env", self.save_service_agent_env)
+        # Global environment variables for all service agents
+        self.app.router.add_get("/api/agents/service/env/global", self.get_global_env)
+        self.app.router.add_put("/api/agents/service/env/global", self.save_global_env)
+
+        # Assets upload endpoint
+        self.app.router.add_post("/api/assets/upload", self.upload_asset)
+        self.app.router.add_get("/assets/{filename:.*}", self.serve_asset)
 
         # Event Explorer API endpoints
         self.app.router.add_get("/api/events/sync", self.sync_events)
@@ -126,6 +175,11 @@ class HttpTransport(Transport):
         self.app.router.add_get("/api/events/mods", self.list_mods)
         self.app.router.add_get("/api/events/search", self.search_events)
         self.app.router.add_get("/api/events/{event_name}", self.get_event_detail)
+
+        # Relay control endpoints
+        self.app.router.add_post("/api/relay/connect", self.relay_connect_handler)
+        self.app.router.add_post("/api/relay/disconnect", self.relay_disconnect_handler)
+        self.app.router.add_get("/api/relay/status", self.relay_status_handler)
 
         # MCP routes (if serve_mcp: true)
         if self._serve_mcp:
@@ -221,6 +275,10 @@ class HttpTransport(Transport):
         self.is_initialized = False
         self.is_listening = False
 
+        # Stop relay connection if active
+        if self._relay_url:
+            await self._stop_relay()
+
         # Clean up MCP sessions if serve_mcp is enabled
         if self._serve_mcp:
             for session_id, session in list(self._mcp_sessions.items()):
@@ -230,6 +288,11 @@ class HttpTransport(Transport):
         if self.site:
             await self.site.stop()
             self.site = None
+
+        if self.runner:
+            await self.runner.cleanup()
+            self.runner = None
+
         return True
 
     async def send(self, message: Event) -> bool:
@@ -268,6 +331,7 @@ class HttpTransport(Transport):
             # Provide minimal stats if health check event fails
             network_stats = {
                 "network_id": "unknown",
+                "network_uuid": "unknown",
                 "network_name": "Unknown Network",
                 "is_running": False,
                 "uptime_seconds": 0,
@@ -280,6 +344,11 @@ class HttpTransport(Transport):
                 "recommended_transport": "grpc",
                 "max_connections": 100,
             }
+
+        # Add relay info if connected
+        if self._relay_public_url:
+            network_stats["relay_url"] = self._relay_public_url
+            network_stats["relay_connected"] = self.relay_connected
 
         return web.json_response(
             {"success": True, "status": "healthy", "data": network_stats}
@@ -298,7 +367,7 @@ class HttpTransport(Transport):
                 payload={},
             )
             event_response = await self.call_event_handler(health_check_event)
-            
+
             if event_response and event_response.success and event_response.data:
                 network_stats = event_response.data
                 network_name = network_stats.get("network_name", "OpenAgents Network")
@@ -324,7 +393,7 @@ class HttpTransport(Transport):
         # Escape HTML to prevent XSS attacks
         network_name_escaped = html.escape(network_name)
         description_escaped = html.escape(description)
-        
+
         # Get additional network profile information safely
         network_profile = {}
         if 'network_stats' in locals() and network_stats is not None:
@@ -332,16 +401,16 @@ class HttpTransport(Transport):
                 network_profile = network_stats.get("network_profile", {})
             except (AttributeError, TypeError):
                 network_profile = {}
-        
+
         website = network_profile.get("website", "https://openagents.org")
         tags = network_profile.get("tags", [])
-        
+
         # Validate and escape additional fields for security
         # Validate website URL - only allow http/https schemes to prevent javascript: or data: injection
         if not website.startswith(('http://', 'https://')):
             website = "https://openagents.org"
         website_escaped = html.escape(website)
-        
+
         # Limit displayed tags to avoid cluttering the UI
         MAX_DISPLAYED_TAGS = 8
 
@@ -513,14 +582,14 @@ class HttpTransport(Transport):
     <div class="card">
         <h1>{network_name_escaped}</h1>
         <div class="subtitle">OpenAgents Agent Network</div>
-        
+
         <div class="status-badge {'online' if is_running else 'offline'}">
             <span>{'🟢' if is_running else '🔴'}</span>
             <span>{'Online' if is_running else 'Offline'}</span>
         </div>
-        
+
         {f'<div class="description">{description_escaped}</div>' if description_escaped else ''}
-        
+
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value">{agent_count}</div>
@@ -537,7 +606,7 @@ class HttpTransport(Transport):
         {f'''<div class="tags">
             {''.join([f'<span class="tag">{html.escape(tag)}</span>' for tag in tags[:MAX_DISPLAYED_TAGS]])}
         </div>''' if tags else ''}
-        
+
         <div class="footer">
             <div class="footer-text">Powered by OpenAgents</div>
             <div class="links">
@@ -600,14 +669,14 @@ class HttpTransport(Transport):
                 logger.info(
                     f"✅ Successfully registered HTTP agent {agent_id} with network {network_name}"
                 )
-                
+
                 # Extract secret and assigned_group from response data
                 secret = ""
                 assigned_group = None
                 if event_response.data and isinstance(event_response.data, dict):
                     secret = event_response.data.get("secret", "")
                     assigned_group = event_response.data.get("assigned_group")
-                
+
                 return web.json_response(
                     {
                         "success": True,
@@ -1050,8 +1119,8 @@ class HttpTransport(Transport):
             )
 
     async def listen(self, address: str) -> bool:
-        runner = web.AppRunner(self.app)
-        await runner.setup()
+        self.runner = web.AppRunner(self.app)
+        await self.runner.setup()
 
         # Use a different port for HTTP (gRPC port + 1000)
         if ":" in address:
@@ -1059,13 +1128,425 @@ class HttpTransport(Transport):
         else:
             host = "0.0.0.0"
             port = address
-        site = web.TCPSite(runner, host, port)
-        await site.start()
+        self.site = web.TCPSite(self.runner, host, port)
+        await self.site.start()
 
         logger.info(f"HTTP transport listening on {host}:{port}")
         self.is_listening = True
-        self.site = site  # Store the site for shutdown
+        self._listen_host = host
+        self._listen_port = int(port)  # Store port for relay request handling
+
+        # Start relay connection if configured
+        if self._relay_url:
+            self._relay_task = asyncio.create_task(self._start_relay())
+
         return True
+
+    # ============================================================
+    # Relay Client Methods
+    # ============================================================
+
+    @property
+    def relay_url(self) -> Optional[str]:
+        """Get the public relay URL if connected."""
+        return self._relay_public_url
+
+    @property
+    def relay_connected(self) -> bool:
+        """Check if connected to relay and registration completed."""
+        return (
+            self._relay_ws is not None
+            and not self._relay_ws.closed
+            and self._relay_public_url is not None
+        )
+
+    async def _start_relay(self):
+        """Start the relay connection."""
+        self._relay_running = True
+
+        # Get network info for registration
+        network_id = "unknown"
+        network_name = "Unknown Network"
+        if self.network_instance:
+            network_id = getattr(self.network_instance, 'network_id', 'unknown')
+            network_name = getattr(self.network_instance, 'network_name', 'Unknown Network')
+
+        try:
+            await self._connect_to_relay(network_id, network_name)
+        except Exception as e:
+            logger.error(f"Failed to connect to relay: {e}")
+            # Attempt reconnection
+            await self._relay_reconnect(network_id, network_name)
+
+    async def _connect_to_relay(self, network_id: str, network_name: str):
+        """Connect to the relay server."""
+        if self._relay_session is None:
+            self._relay_session = aiohttp.ClientSession()
+
+        ws_url = self._relay_url
+        if not ws_url.startswith("ws"):
+            ws_url = ws_url.replace("https://", "wss://").replace("http://", "ws://")
+
+        # Ensure we connect to the /register WebSocket endpoint
+        if not ws_url.endswith("/register"):
+            ws_url = ws_url.rstrip("/") + "/register"
+
+        logger.info(f"Connecting to relay: {ws_url}")
+
+        try:
+            self._relay_ws = await self._relay_session.ws_connect(ws_url)
+        except Exception as e:
+            logger.error(f"Failed to connect to relay WebSocket: {e}")
+            raise
+
+        # Send registration message
+        # Use network_uuid for relay registration to ensure uniqueness per session
+        relay_network_id = network_id
+        if self.network_instance:
+            network_uuid = getattr(self.network_instance, 'network_uuid', None)
+            if network_uuid:
+                relay_network_id = network_uuid
+
+        register_msg = {
+            "type": "register",
+            "network_id": relay_network_id,
+            "info": {
+                "name": network_name,
+            }
+        }
+        logger.info(f"Registering with relay: network_id={relay_network_id}, name={network_name}")
+        await self._relay_ws.send_json(register_msg)
+
+        # Wait for registration response
+        try:
+            msg = await asyncio.wait_for(self._relay_ws.receive(), timeout=10.0)
+        except asyncio.TimeoutError:
+            raise ConnectionError("Timeout waiting for relay registration response")
+
+        logger.debug(f"Received relay message type: {msg.type}")
+
+        if msg.type == aiohttp.WSMsgType.TEXT:
+            data = json.loads(msg.data)
+            logger.debug(f"Relay registration response: {data}")
+            if data.get("type") == "registered":
+                self._relay_tunnel_id = data.get("tunnel_id")
+                self._relay_public_url = data.get("relay_url")
+                logger.info(f"Connected to relay: {self._relay_public_url}, tunnel_id: {self._relay_tunnel_id}")
+
+                # Start message loop and heartbeat
+                asyncio.create_task(self._relay_message_loop())
+                self._relay_heartbeat_task = asyncio.create_task(self._relay_heartbeat_loop())
+                return
+            elif data.get("type") == "error":
+                raise ConnectionError(f"Relay registration failed: {data.get('message')}")
+
+        raise ConnectionError("Unexpected response from relay")
+
+    async def _relay_message_loop(self):
+        """Process incoming relay messages."""
+        while self._relay_running and self._relay_ws and not self._relay_ws.closed:
+            try:
+                msg = await self._relay_ws.receive()
+
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    data = json.loads(msg.data)
+                    await self._handle_relay_message(data)
+                elif msg.type == aiohttp.WSMsgType.CLOSED:
+                    logger.warning("Relay WebSocket closed by server")
+                    break
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    logger.error(f"Relay WebSocket error: {self._relay_ws.exception()}")
+                    break
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in relay message loop: {e}")
+                break
+
+        # Connection lost - attempt reconnect
+        if self._relay_running:
+            network_id = getattr(self.network_instance, 'network_id', 'unknown') if self.network_instance else 'unknown'
+            network_name = getattr(self.network_instance, 'network_name', 'Unknown') if self.network_instance else 'Unknown'
+            await self._relay_reconnect(network_id, network_name)
+
+    async def _handle_relay_message(self, data: Dict[str, Any]):
+        """Handle an incoming message from the relay."""
+        msg_type = data.get("type")
+
+        if msg_type == "http_request":
+            await self._handle_relay_http_request(data)
+        elif msg_type == "heartbeat_ack":
+            pass  # Heartbeat acknowledged
+        elif msg_type == "error":
+            logger.error(f"Relay error: {data.get('message')}")
+        else:
+            logger.debug(f"Unknown relay message type: {msg_type}")
+
+    async def _handle_relay_http_request(self, request: Dict[str, Any]):
+        """
+        Handle an HTTP request from the relay.
+
+        Makes a real HTTP request to localhost and sends the response back.
+        """
+        request_id = request.get("requestId")
+        method = request.get("method", "GET")
+        path = request.get("path", "/")
+        query = request.get("query", {})
+        headers = request.get("headers", {})
+        body = request.get("body")
+
+        try:
+            # Build the local URL
+            local_url = f"http://127.0.0.1:{self._listen_port}{path}"
+            if query:
+                query_string = urlencode(query)
+                local_url = f"{local_url}?{query_string}"
+
+            # Prepare headers (filter out hop-by-hop headers)
+            hop_by_hop = {'connection', 'keep-alive', 'proxy-authenticate',
+                         'proxy-authorization', 'te', 'trailers', 'transfer-encoding', 'upgrade'}
+            req_headers = {k: v for k, v in headers.items()
+                          if k.lower() not in hop_by_hop}
+
+            # Prepare body
+            body_data = None
+            if body:
+                if isinstance(body, str):
+                    body_data = body.encode('utf-8')
+                elif isinstance(body, dict):
+                    body_data = json.dumps(body).encode('utf-8')
+                elif isinstance(body, bytes):
+                    body_data = body
+
+            # Make real HTTP request to localhost
+            async with aiohttp.ClientSession() as session:
+                async with session.request(
+                    method=method,
+                    url=local_url,
+                    headers=req_headers,
+                    data=body_data,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as response:
+                    # Read response body
+                    response_body_bytes = await response.read()
+
+                    # Try to decode as JSON, otherwise as text
+                    response_body = None
+                    content_type = response.headers.get('Content-Type', '')
+                    if 'application/json' in content_type:
+                        try:
+                            response_body = json.loads(response_body_bytes)
+                        except json.JSONDecodeError:
+                            response_body = response_body_bytes.decode('utf-8', errors='replace')
+                    else:
+                        response_body = response_body_bytes.decode('utf-8', errors='replace')
+
+                    # Filter response headers
+                    response_headers = {}
+                    for key, value in response.headers.items():
+                        if key.lower() not in hop_by_hop:
+                            response_headers[key] = value
+
+                    response_msg = {
+                        "type": "http_response",
+                        "requestId": request_id,
+                        "status": response.status,
+                        "headers": response_headers,
+                        "body": response_body,
+                    }
+
+            if self._relay_ws and not self._relay_ws.closed:
+                await self._relay_ws.send_json(response_msg)
+
+        except Exception as e:
+            logger.error(f"Error handling relay request {request_id}: {e}")
+
+            error_response = {
+                "type": "http_response",
+                "requestId": request_id,
+                "status": 500,
+                "headers": {"Content-Type": "application/json"},
+                "body": {"error": str(e)},
+            }
+
+            if self._relay_ws and not self._relay_ws.closed:
+                await self._relay_ws.send_json(error_response)
+
+    async def _relay_heartbeat_loop(self):
+        """Send periodic heartbeats to keep relay connection alive."""
+        while self._relay_running:
+            try:
+                await asyncio.sleep(25)  # Send heartbeat every 25 seconds
+
+                if self._relay_ws and not self._relay_ws.closed:
+                    await self._relay_ws.send_json({"type": "heartbeat"})
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Relay heartbeat error: {e}")
+
+    async def _relay_reconnect(self, network_id: str, network_name: str):
+        """Attempt to reconnect to the relay."""
+        max_attempts = 5
+        attempts = 0
+
+        while self._relay_running and attempts < max_attempts:
+            attempts += 1
+            delay = 5.0 * attempts
+
+            logger.info(f"Reconnecting to relay in {delay}s (attempt {attempts})")
+            await asyncio.sleep(delay)
+
+            try:
+                await self._connect_to_relay(network_id, network_name)
+                logger.info("Reconnected to relay")
+                return
+            except Exception as e:
+                logger.error(f"Relay reconnection failed: {e}")
+
+        logger.error("Max relay reconnection attempts reached")
+        self._relay_running = False
+
+    async def _stop_relay(self):
+        """Stop the relay connection."""
+        self._relay_running = False
+
+        if self._relay_heartbeat_task:
+            self._relay_heartbeat_task.cancel()
+            try:
+                await self._relay_heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
+        if self._relay_task:
+            self._relay_task.cancel()
+            try:
+                await self._relay_task
+            except asyncio.CancelledError:
+                pass
+
+        if self._relay_ws and not self._relay_ws.closed:
+            try:
+                await self._relay_ws.send_json({"type": "unregister"})
+            except:
+                pass
+            await self._relay_ws.close()
+
+        if self._relay_session:
+            await self._relay_session.close()
+            self._relay_session = None
+
+        self._relay_public_url = None
+        self._relay_tunnel_id = None
+        logger.info("Relay connection stopped")
+
+    async def relay_connect_handler(self, request):
+        """API endpoint to connect to relay server."""
+        try:
+            # Parse optional relay URL from request body
+            try:
+                data = await request.json()
+                relay_url = data.get("relay_url", DEFAULT_RELAY_URL)
+            except:
+                relay_url = DEFAULT_RELAY_URL
+
+            # Check if already connected
+            if self.relay_connected:
+                return web.json_response({
+                    "success": True,
+                    "message": "Already connected to relay",
+                    "relay_url": self._relay_public_url,
+                    "tunnel_id": self._relay_tunnel_id,
+                    "connected": True,
+                })
+
+            # Clean up any stale connection (WebSocket open but registration incomplete)
+            if self._relay_ws is not None and not self._relay_ws.closed:
+                logger.warning("Cleaning up stale relay WebSocket connection")
+                try:
+                    await self._relay_ws.close()
+                except Exception:
+                    pass
+                self._relay_ws = None
+
+            # Set relay URL and start connection
+            self._relay_url = relay_url
+            self._relay_running = True
+
+            # Get network info for registration
+            network_id = "unknown"
+            network_name = "Unknown Network"
+            if self.network_instance:
+                network_id = getattr(self.network_instance, 'network_id', 'unknown')
+                network_name = getattr(self.network_instance, 'network_name', 'Unknown Network')
+
+            try:
+                await self._connect_to_relay(network_id, network_name)
+                return web.json_response({
+                    "success": True,
+                    "message": "Connected to relay",
+                    "relay_url": self._relay_public_url,
+                    "tunnel_id": self._relay_tunnel_id,
+                    "connected": True,
+                })
+            except Exception as e:
+                logger.error(f"Failed to connect to relay: {e}")
+                self._relay_running = False
+                return web.json_response({
+                    "success": False,
+                    "error": str(e),
+                    "connected": False,
+                }, status=502)
+
+        except Exception as e:
+            logger.error(f"Error in relay connect handler: {e}")
+            return web.json_response({
+                "success": False,
+                "error": str(e),
+            }, status=500)
+
+    async def relay_disconnect_handler(self, request):
+        """API endpoint to disconnect from relay server."""
+        try:
+            if not self.relay_connected:
+                return web.json_response({
+                    "success": True,
+                    "message": "Not connected to relay",
+                    "connected": False,
+                })
+
+            await self._stop_relay()
+
+            return web.json_response({
+                "success": True,
+                "message": "Disconnected from relay",
+                "connected": False,
+            })
+
+        except Exception as e:
+            logger.error(f"Error in relay disconnect handler: {e}")
+            return web.json_response({
+                "success": False,
+                "error": str(e),
+            }, status=500)
+
+    async def relay_status_handler(self, request):
+        """API endpoint to get relay connection status."""
+        try:
+            return web.json_response({
+                "success": True,
+                "connected": self.relay_connected,
+                "relay_url": self._relay_public_url,
+                "tunnel_id": self._relay_tunnel_id,
+            })
+        except Exception as e:
+            logger.error(f"Error in relay status handler: {e}")
+            return web.json_response({
+                "success": False,
+                "error": str(e),
+            }, status=500)
 
     async def cache_upload(self, request):
         """Handle file upload to shared cache via HTTP multipart form."""
@@ -1292,9 +1773,9 @@ class HttpTransport(Transport):
                 {"success": False, "error": str(e)},
                 status=500,
             )
-    
+
     # Agent Management API handlers
-    
+
     async def get_service_agents(self, request):
         """Get list of all service agents with their status."""
         try:
@@ -1303,138 +1784,138 @@ class HttpTransport(Transport):
                     {"success": False, "error": "Agent manager not available"},
                     status=503,
                 )
-            
+
             agent_manager = self.network_instance.agent_manager
             agents_status = agent_manager.get_all_agents_status()
-            
+
             return web.json_response({
                 "success": True,
                 "agents": agents_status
             })
-        
+
         except Exception as e:
             logger.error(f"Error getting service agents: {e}")
             return web.json_response(
                 {"success": False, "error": str(e)},
                 status=500,
             )
-    
+
     async def start_service_agent(self, request):
         """Start a specific service agent."""
         try:
             agent_id = request.match_info.get("agent_id")
-            
+
             if not agent_id:
                 return web.json_response(
                     {"success": False, "error": "agent_id is required"},
                     status=400,
                 )
-            
+
             if not self.network_instance or not hasattr(self.network_instance, "agent_manager"):
                 return web.json_response(
                     {"success": False, "error": "Agent manager not available"},
                     status=503,
                 )
-            
+
             agent_manager = self.network_instance.agent_manager
             result = await agent_manager.start_agent(agent_id)
-            
+
             if result["success"]:
                 return web.json_response(result)
             else:
                 return web.json_response(result, status=400)
-        
+
         except Exception as e:
             logger.error(f"Error starting service agent: {e}")
             return web.json_response(
                 {"success": False, "error": str(e)},
                 status=500,
             )
-    
+
     async def stop_service_agent(self, request):
         """Stop a specific service agent."""
         try:
             agent_id = request.match_info.get("agent_id")
-            
+
             if not agent_id:
                 return web.json_response(
                     {"success": False, "error": "agent_id is required"},
                     status=400,
                 )
-            
+
             if not self.network_instance or not hasattr(self.network_instance, "agent_manager"):
                 return web.json_response(
                     {"success": False, "error": "Agent manager not available"},
                     status=503,
                 )
-            
+
             agent_manager = self.network_instance.agent_manager
             result = await agent_manager.stop_agent(agent_id)
-            
+
             if result["success"]:
                 return web.json_response(result)
             else:
                 return web.json_response(result, status=400)
-        
+
         except Exception as e:
             logger.error(f"Error stopping service agent: {e}")
             return web.json_response(
                 {"success": False, "error": str(e)},
                 status=500,
             )
-    
+
     async def restart_service_agent(self, request):
         """Restart a specific service agent."""
         try:
             agent_id = request.match_info.get("agent_id")
-            
+
             if not agent_id:
                 return web.json_response(
                     {"success": False, "error": "agent_id is required"},
                     status=400,
                 )
-            
+
             if not self.network_instance or not hasattr(self.network_instance, "agent_manager"):
                 return web.json_response(
                     {"success": False, "error": "Agent manager not available"},
                     status=503,
                 )
-            
+
             agent_manager = self.network_instance.agent_manager
             result = await agent_manager.restart_agent(agent_id)
-            
+
             if result["success"]:
                 return web.json_response(result)
             else:
                 return web.json_response(result, status=400)
-        
+
         except Exception as e:
             logger.error(f"Error restarting service agent: {e}")
             return web.json_response(
                 {"success": False, "error": str(e)},
                 status=500,
             )
-    
+
     async def get_service_agent_status(self, request):
         """Get status of a specific service agent."""
         try:
             agent_id = request.match_info.get("agent_id")
-            
+
             if not agent_id:
                 return web.json_response(
                     {"success": False, "error": "agent_id is required"},
                     status=400,
                 )
-            
+
             if not self.network_instance or not hasattr(self.network_instance, "agent_manager"):
                 return web.json_response(
                     {"success": False, "error": "Agent manager not available"},
                     status=503,
                 )
-            
+
             agent_manager = self.network_instance.agent_manager
             status = agent_manager.get_agent_status(agent_id)
-            
+
             if status:
                 return web.json_response({
                     "success": True,
@@ -1445,42 +1926,42 @@ class HttpTransport(Transport):
                     {"success": False, "error": "Agent not found"},
                     status=404,
                 )
-        
+
         except Exception as e:
             logger.error(f"Error getting service agent status: {e}")
             return web.json_response(
                 {"success": False, "error": str(e)},
                 status=500,
             )
-    
+
     async def get_service_agent_logs(self, request):
         """Get recent log lines for a specific service agent."""
         try:
             agent_id = request.match_info.get("agent_id")
             lines = int(request.query.get("lines", "100"))
-            
+
             if not agent_id:
                 return web.json_response(
                     {"success": False, "error": "agent_id is required"},
                     status=400,
                 )
-            
+
             # Validate lines parameter
             if lines < 1 or lines > 10000:
                 return web.json_response(
                     {"success": False, "error": "lines must be between 1 and 10000"},
                     status=400,
                 )
-            
+
             if not self.network_instance or not hasattr(self.network_instance, "agent_manager"):
                 return web.json_response(
                     {"success": False, "error": "Agent manager not available"},
                     status=503,
                 )
-            
+
             agent_manager = self.network_instance.agent_manager
             log_lines = agent_manager.get_agent_logs(agent_id, lines)
-            
+
             if log_lines is not None:
                 return web.json_response({
                     "success": True,
@@ -1491,7 +1972,7 @@ class HttpTransport(Transport):
                     {"success": False, "error": "Agent not found or no logs available"},
                     status=404,
                 )
-        
+
         except ValueError:
             return web.json_response(
                 {"success": False, "error": "Invalid lines parameter"},
@@ -1678,14 +2159,197 @@ class HttpTransport(Transport):
                 status=500,
             )
 
+    async def get_global_env(self, request):
+        """Get global environment variables for all service agents."""
+        try:
+            if not self.network_instance or not hasattr(self.network_instance, "agent_manager"):
+                return web.json_response(
+                    {"success": False, "error": "Agent manager not available"},
+                    status=503,
+                )
+
+            agent_manager = self.network_instance.agent_manager
+            env_vars = agent_manager.get_global_env_vars()
+
+            return web.json_response({
+                "success": True,
+                "env_vars": env_vars
+            })
+
+        except Exception as e:
+            logger.error(f"Error getting global env vars: {e}")
+            return web.json_response(
+                {"success": False, "error": str(e)},
+                status=500,
+            )
+
+    async def save_global_env(self, request):
+        """Save global environment variables for all service agents."""
+        try:
+            if not self.network_instance or not hasattr(self.network_instance, "agent_manager"):
+                return web.json_response(
+                    {"success": False, "error": "Agent manager not available"},
+                    status=503,
+                )
+
+            # Parse request body
+            try:
+                data = await request.json()
+            except Exception:
+                return web.json_response(
+                    {"success": False, "error": "Invalid JSON body"},
+                    status=400,
+                )
+
+            env_vars = data.get("env_vars")
+            if env_vars is None:
+                return web.json_response(
+                    {"success": False, "error": "env_vars field required"},
+                    status=400,
+                )
+
+            if not isinstance(env_vars, dict):
+                return web.json_response(
+                    {"success": False, "error": "env_vars must be an object"},
+                    status=400,
+                )
+
+            agent_manager = self.network_instance.agent_manager
+            result = agent_manager.set_global_env_vars(env_vars)
+
+            if result["success"]:
+                return web.json_response(result)
+            else:
+                return web.json_response(result, status=400)
+
+        except Exception as e:
+            logger.error(f"Error saving global env vars: {e}")
+            return web.json_response(
+                {"success": False, "error": str(e)},
+                status=500,
+            )
+
+    async def upload_asset(self, request):
+        """Upload an asset file (icon, image, etc.) to the workspace assets folder."""
+        try:
+            if not self.workspace_path:
+                return web.json_response(
+                    {"success": False, "error": "Workspace not configured"},
+                    status=503,
+                )
+
+            # Parse multipart form data
+            reader = await request.multipart()
+
+            file_data = None
+            file_name = None
+            asset_type = "general"  # default type
+
+            async for field in reader:
+                if field.name == "file":
+                    file_name = field.filename
+                    file_data = await field.read()
+                elif field.name == "type":
+                    asset_type = (await field.read()).decode("utf-8")
+
+            if not file_data or not file_name:
+                return web.json_response(
+                    {"success": False, "error": "No file provided"},
+                    status=400,
+                )
+
+            # Validate file size (max 5MB for assets)
+            if len(file_data) > 5 * 1024 * 1024:
+                return web.json_response(
+                    {"success": False, "error": "File too large (max 5MB)"},
+                    status=400,
+                )
+
+            # Sanitize filename
+            safe_filename = os.path.basename(file_name)
+
+            # Generate unique filename to avoid conflicts
+            file_ext = os.path.splitext(safe_filename)[1]
+            unique_id = str(uuid.uuid4())[:8]
+            final_filename = f"{asset_type}_{unique_id}{file_ext}"
+
+            # Create assets directory if it doesn't exist
+            assets_dir = Path(self.workspace_path) / "assets"
+            assets_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save the file
+            file_path = assets_dir / final_filename
+            with open(file_path, "wb") as f:
+                f.write(file_data)
+
+            # Generate URL for the asset
+            # The asset will be served at /assets/{filename}
+            asset_url = f"/assets/{final_filename}"
+
+            logger.info(f"Uploaded asset: {final_filename} ({len(file_data)} bytes)")
+
+            return web.json_response({
+                "success": True,
+                "url": asset_url,
+                "filename": final_filename,
+                "size": len(file_data)
+            })
+
+        except Exception as e:
+            logger.error(f"Error uploading asset: {e}")
+            return web.json_response(
+                {"success": False, "error": str(e)},
+                status=500,
+            )
+
+    async def serve_asset(self, request):
+        """Serve an asset file from the workspace assets folder."""
+        try:
+            if not self.workspace_path:
+                return web.Response(status=503, text="Workspace not configured")
+
+            filename = request.match_info.get("filename", "")
+
+            # Sanitize to prevent path traversal
+            safe_filename = os.path.basename(filename)
+            if safe_filename != filename:
+                return web.Response(status=400, text="Invalid filename")
+
+            assets_dir = Path(self.workspace_path) / "assets"
+            file_path = assets_dir / safe_filename
+
+            if not file_path.exists() or not file_path.is_file():
+                return web.Response(status=404, text="Asset not found")
+
+            # Determine content type
+            content_type, _ = mimetypes.guess_type(str(file_path))
+            if not content_type:
+                content_type = "application/octet-stream"
+
+            # Read and return file
+            with open(file_path, "rb") as f:
+                content = f.read()
+
+            return web.Response(
+                body=content,
+                content_type=content_type,
+                headers={
+                    "Cache-Control": "public, max-age=86400"  # Cache for 24 hours
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error serving asset: {e}")
+            return web.Response(status=500, text=str(e))
+
     async def sync_events(self, request):
         """Handle event index sync from GitHub."""
         try:
             from openagents.utils.event_indexer import get_event_indexer
-            
+
             indexer = get_event_indexer()
             result = indexer.sync_from_github()
-            
+
             return web.json_response({
                 "success": True,
                 "data": result
@@ -1701,18 +2365,18 @@ class HttpTransport(Transport):
         """List all indexed events with optional filters."""
         try:
             from openagents.utils.event_indexer import get_event_indexer
-            
+
             indexer = get_event_indexer()
-            
+
             # Get query parameters
             mod_filter = request.query.get("mod")
             type_filter = request.query.get("type")
-            
+
             events = indexer.get_all_events(
                 mod_filter=mod_filter if mod_filter else None,
                 type_filter=type_filter if type_filter else None
             )
-            
+
             return web.json_response({
                 "success": True,
                 "data": {
@@ -1731,10 +2395,10 @@ class HttpTransport(Transport):
         """List all indexed mods."""
         try:
             from openagents.utils.event_indexer import get_event_indexer
-            
+
             indexer = get_event_indexer()
             mods = indexer.get_mods()
-            
+
             return web.json_response({
                 "success": True,
                 "data": {
@@ -1753,18 +2417,18 @@ class HttpTransport(Transport):
         """Search events by query string."""
         try:
             from openagents.utils.event_indexer import get_event_indexer
-            
+
             indexer = get_event_indexer()
-            
+
             query = request.query.get("q", "")
             if not query:
                 return web.json_response(
                     {"success": False, "error_message": "Query parameter 'q' is required"},
                     status=400
                 )
-            
+
             results = indexer.search_events(query)
-            
+
             return web.json_response({
                 "success": True,
                 "data": {
@@ -1785,31 +2449,31 @@ class HttpTransport(Transport):
         try:
             from openagents.utils.event_indexer import get_event_indexer
             import urllib.parse
-            
+
             indexer = get_event_indexer()
-            
+
             event_name = request.match_info.get("event_name")
             if not event_name:
                 return web.json_response(
                     {"success": False, "error_message": "Event name is required"},
                     status=400
                 )
-            
+
             # Decode URL-encoded event name
             event_name = urllib.parse.unquote(event_name)
-            
+
             event = indexer.get_event(event_name)
-            
+
             if not event:
                 return web.json_response(
                     {"success": False, "error_message": f"Event '{event_name}' not found"},
                     status=404
                 )
-            
+
             # Generate example code
             examples = _generate_event_examples(event)
             event_with_examples = {**event, "examples": examples}
-            
+
             return web.json_response({
                 "success": True,
                 "data": event_with_examples
@@ -2221,13 +2885,256 @@ class HttpTransport(Transport):
                 return web.Response(status=500, text="Internal server error")
         return web.Response(status=404, text="Not found")
 
+    def _require_admin(self, request) -> bool:
+        """Check if request is from an agent in the 'admin' group.
+
+        Validates agent credentials (X-Agent-ID and X-Agent-Secret headers)
+        and checks if the agent belongs to the 'admin' group.
+
+        This uses the same approach as SystemCommandProcessor._check_admin_access,
+        checking topology.agent_group_membership.
+
+        Args:
+            request: aiohttp request object
+        Returns:
+            bool: True if agent is in admin group, False otherwise
+        """
+        # return True
+        if not self.network_instance:
+            logger.warning("Admin check failed: network instance not available")
+            return False
+
+        # Extract agent credentials from headers
+        agent_id = request.headers.get('X-Agent-ID')
+        agent_secret = request.headers.get('X-Agent-Secret')
+
+        if not agent_id or not agent_secret:
+            logger.warning("Admin check failed: missing X-Agent-ID or X-Agent-Secret headers")
+            return False
+
+        # Validate agent secret
+        if hasattr(self.network_instance, 'secret_manager'):
+            if not self.network_instance.secret_manager.validate_secret(agent_id, agent_secret):
+                logger.warning(f"Admin check failed: invalid secret for agent {agent_id}")
+                return False
+        else:
+            logger.warning("Admin check failed: secret_manager not available")
+            return False
+
+        # Check if agent is in admin group (using topology.agent_group_membership)
+        # This is consistent with SystemCommandProcessor._check_admin_access
+        if not self.network_instance.topology:
+            logger.warning("Admin check failed: topology not available")
+            return False
+
+        agent_group = self.network_instance.topology.agent_group_membership.get(agent_id)
+        if agent_group == "admin":
+            logger.info(f"Admin access granted for agent: {agent_id} (group: {agent_group})")
+            return True
+        else:
+            logger.warning(f"Admin check failed: agent {agent_id} is in group '{agent_group}', not 'admin'")
+            return False
+
+    async def export_network(self, request):
+        """Export network configuration (admin only)."""
+        try:
+            # Check admin permissions
+            if not self._require_admin(request):
+                return web.json_response(
+                    {"success": False, "error_message": "Admin access required"},
+                    status=403
+                )
+
+            # Get query parameters
+            include_passwords = request.query.get("include_password_hashes", "false").lower() == "true"
+            include_sensitive = request.query.get("include_sensitive_config", "false").lower() == "true"
+            notes = request.query.get("notes")
+
+            logger.info(f"Network export requested (passwords={include_passwords}, sensitive={include_sensitive})")
+
+            # Get network instance from event handler
+            # The network_instance is set when transport is bound to network
+            if not self.network_instance:
+                return web.json_response(
+                    {"success": False, "error_message": "Network instance not available"},
+                    status=500
+                )
+
+            # Export network
+            exporter = NetworkExporter(self.network_instance)
+            zip_buffer = exporter.export_to_zip(
+                include_password_hashes=include_passwords,
+                include_sensitive_config=include_sensitive,
+                notes=notes
+            )
+
+            # Generate filename
+            filename = f"{self.network_instance.network_name}_export.zip"
+
+            # Return as streaming response
+            return web.Response(
+                body=zip_buffer.getvalue(),
+                headers={
+                    'Content-Type': 'application/zip',
+                    'Content-Disposition': f'attachment; filename="{filename}"'
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Network export failed: {e}", exc_info=True)
+            return web.json_response(
+                {"success": False, "error_message": "Export failed"},
+                status=500
+            )
+
+    async def validate_import(self, request):
+        """Validate network import file (admin only)."""
+        try:
+            # Check admin permissions
+            if not self._require_admin(request):
+                return web.json_response(
+                    {"success": False, "error_message": "Admin access required"},
+                    status=403
+                )
+
+            logger.info("Import validation requested")
+
+            # Read multipart/form-data
+            reader = await request.multipart()
+            zip_data = None
+
+            async for field in reader:
+                if field.name == 'file':
+                    zip_data = await field.read()
+                    break
+
+            if not zip_data:
+                return web.json_response(
+                    {"success": False, "error_message": "No file provided"},
+                    status=400
+                )
+
+            # Validate import
+            zip_buffer = BytesIO(zip_data)
+            importer = NetworkImporter()
+            validation_result = importer.validate(zip_buffer)
+
+            # Return validation result
+            return web.json_response(validation_result.model_dump())
+
+        except Exception as e:
+            logger.error(f"Import validation failed: {e}", exc_info=True)
+            return web.json_response(
+                {
+                    "valid": False,
+                    "errors": ["Validation error occurred"],
+                    "warnings": []
+                },
+                status=200  # Return 200 with error in body, not 500
+            )
+
+    async def apply_import(self, request):
+        """Apply network import (admin only)."""
+        try:
+            # Check admin permissions
+            if not self._require_admin(request):
+                return web.json_response(
+                    {"success": False, "error_message": "Admin access required"},
+                    status=403
+                )
+
+            logger.info("Import apply requested")
+
+            if not self.network_instance:
+                return web.json_response(
+                    {
+                        "success": False,
+                        "message": "Network instance not available",
+                        "errors": ["Network not initialized"]
+                    },
+                    status=500
+                )
+
+            # Read multipart/form-data
+            reader = await request.multipart()
+            zip_data = None
+            mode = ImportMode.OVERWRITE  # Default
+            new_name = None
+
+            async for field in reader:
+                if field.name == 'file':
+                    zip_data = await field.read()
+                elif field.name == 'mode':
+                    mode_str = (await field.read()).decode('utf-8')
+                    try:
+                        mode = ImportMode(mode_str)
+                    except ValueError:
+                        logger.warning(f"Invalid import mode: {mode_str}, using OVERWRITE")
+                elif field.name == 'new_name':
+                    new_name = (await field.read()).decode('utf-8')
+
+            if not zip_data:
+                return web.json_response(
+                    {
+                        "success": False,
+                        "message": "No file provided",
+                        "errors": ["File is required"]
+                    },
+                    status=400
+                )
+
+            # Apply import asynchronously to avoid deadlock
+            # (network restart will shutdown HTTP transport which would wait for this request)
+            zip_buffer = BytesIO(zip_data)
+            importer = NetworkImporter(self.network_instance)
+
+            # Execute import in background to avoid blocking the response
+            async def _do_import():
+                """Execute import in background."""
+                try:
+                    result = await importer.apply(
+                        zip_buffer,
+                        mode=mode,
+                        network=self.network_instance,
+                        new_name=new_name
+                    )
+                    if result.success:
+                        logger.info(f"Import completed successfully: {result.message}")
+                    else:
+                        logger.error(f"Import failed: {result.message}, errors: {result.errors}")
+                except Exception as e:
+                    logger.error(f"Import background task failed: {e}", exc_info=True)
+
+            # Schedule the import task but don't await it
+            asyncio.create_task(_do_import())
+
+            # Return immediate success response (actual result will be in logs)
+            return web.json_response({
+                "success": True,
+                "message": f"Import initiated (mode: {mode}). Network will restart in background. Check logs for status.",
+                "warnings": ["Import is executing asynchronously. Monitor logs for completion status."],
+                "network_restarted": False,  # Not yet, will happen in background
+                "applied_config": None
+            })
+
+        except Exception as e:
+            logger.error(f"Import apply failed: {e}", exc_info=True)
+            return web.json_response(
+                {
+                    "success": False,
+                    "message": "Import failed",
+                    "errors": [str(e)]
+                },
+                status=200  # Return 200 with error in body, not 500
+            )
+
 
 def _generate_event_examples(event: Dict[str, Any]) -> Dict[str, str]:
     """Generate code examples for an event."""
     event_name = event.get('event_name', '')
     event_type = event.get('event_type', 'operation')
     request_schema = event.get('request_schema', {})
-    
+
     # Python example
     python_example = f"""# Python example
 from openagents import Agent
@@ -2239,7 +3146,7 @@ response = await agent.send_event(
     payload={{
         # Add your payload here based on the schema
 """
-    
+
     # Add payload fields from schema
     if request_schema and 'properties' in request_schema:
         for prop_name, prop_info in request_schema['properties'].items():
@@ -2247,19 +3154,19 @@ response = await agent.send_event(
                 prop_type = prop_info.get('type', 'string')
                 is_required = prop_info.get('required', False)
                 default = prop_info.get('default')
-                
+
                 if default is not None:
                     python_example += f'        "{prop_name}": {repr(default)},  # {prop_type}\n'
                 elif is_required:
                     python_example += f'        "{prop_name}": "value",  # {prop_type} (required)\n'
                 else:
                     python_example += f'        # "{prop_name}": "value",  # {prop_type} (optional)\n'
-    
+
     python_example += """    }
 )
 print(response)
 """
-    
+
     # JavaScript example
     js_example = f"""// JavaScript example
 const response = await connector.sendEvent({{
@@ -2268,26 +3175,26 @@ const response = await connector.sendEvent({{
     payload: {{
         // Add your payload here based on the schema
 """
-    
+
     if request_schema and 'properties' in request_schema:
         for prop_name, prop_info in request_schema['properties'].items():
             if isinstance(prop_info, dict):
                 prop_type = prop_info.get('type', 'string')
                 is_required = prop_info.get('required', False)
                 default = prop_info.get('default')
-                
+
                 if default is not None:
                     js_example += f'        {prop_name}: {repr(default)},  // {prop_type}\n'
                 elif is_required:
                     js_example += f'        {prop_name}: "value",  // {prop_type} (required)\n'
                 else:
                     js_example += f'        // {prop_name}: "value",  // {prop_type} (optional)\n'
-    
+
     js_example += """    }
 });
 console.log(response);
 """
-    
+
     return {
         "python": python_example,
         "javascript": js_example,
