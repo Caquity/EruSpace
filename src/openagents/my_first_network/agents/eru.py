@@ -6,13 +6,19 @@ from dotenv import load_dotenv
 from openagents.agents.worker_agent import WorkerAgent, EventContext, ChannelMessageContext
 from openagents.models.agent_config import AgentConfig
 
-# Load .env file from the same directory as network.yaml (parent of agents/)
-env_file = Path(__file__).parent.parent / "network_configuration.env"
-if env_file.exists():
-    load_dotenv(env_file)
+# ⭐ 尝试加载 .env 文件（本地开发用），如果不存在则使用系统环境变量（云服务用）
+env_paths = [
+    "src/openagents/my_first_network/network_configuration.env",
+    "network_configuration.env",
+    ".env"
+]
+for env_path in env_paths:
+    if Path(env_path).exists():
+        load_dotenv(env_path)
+        print(f"✅ Loaded environment from {env_path}")
+        break
 else:
-    # In Docker, environment variables should be set directly
-    print(f"⚠️  .env file not found at {env_file}, using environment variables")
+    print("ℹ️  No .env file found, using system environment variables")
 
 # logging.basicConfig(level=logging.DEBUG)
 
@@ -65,9 +71,9 @@ if __name__ == "__main__":
     agent = AIAssistant(agent_config=agent_config)
 
     agent.start(
-            network_host=os.getenv("NETWORK_HOST"),
+            network_host=os.getenv("NETWORK_HOST", "localhost"),
             network_port=int(os.getenv("NETWORK_PORT", "8700")),
-            network_id=os.getenv("NETWORK_ID","cqy-eru-1")
+            network_id=os.getenv("NETWORK_ID", "cqy-eru-1")
     )
     agent.wait_for_stop()
  

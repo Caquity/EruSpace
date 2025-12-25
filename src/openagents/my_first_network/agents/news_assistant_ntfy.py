@@ -411,15 +411,26 @@ class NewsAssistantAgent(WorkerAgent):
 async def main():
     """Run the news assistant agent."""
     import os
+    from pathlib import Path
     from dotenv import load_dotenv
     
-    # Load environment variables
-    load_dotenv("../network_configuration.env")
+    env_paths = [
+        Path(__file__).parent.parent / "network_configuration.env",
+        "network_configuration.env",
+        ".env"
+    ]
+    for env_path in env_paths:
+        if Path(env_path).exists():
+            load_dotenv(env_path)
+            print(f"✅ Loaded environment from {env_path}")
+            break
+    else:
+        print("ℹ️  No .env file found, using system environment variables")
     
-    # Use environment variables
+    # Use environment variables with Docker-friendly defaults
     network_host = os.getenv("NETWORK_HOST", "localhost")
     network_port = int(os.getenv("NETWORK_PORT", "8700"))
-    network_id = os.getenv("NETWORK_ID", "cqy.eru.1")
+    network_id = os.getenv("NETWORK_ID", "cqy-eru-1")
     
     print(f"🚀 Starting Eru-News Assistant...")
     print(f"   Network: {network_host}:{network_port}")

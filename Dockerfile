@@ -47,17 +47,6 @@ COPY --from=studio-builder /app/studio/build /app/studio/build
 # Copy your custom network configuration
 COPY src/openagents/my_first_network/ /app/my_first_network/
 
-# Copy .env file for agent configuration (contains API keys)
-# ⚠️  SECURITY WARNING: Only for development/testing!
-# For production (Zeabur/cloud), set API keys as environment variables in the platform:
-#   - HUGGINGFACE_API_KEY
-#   - DASHSCOPE_API_KEY
-#   - GEMINI_API_KEY
-#   - BRAVE_API_KEY
-#   - SILICONFLOW_API_KEY
-# The .env file is used as fallback if environment variables are not set
-COPY src/openagents/my_first_network/network_configuration.env /app/my_first_network/network_configuration.env
-
 # Copy startup script
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
@@ -76,11 +65,6 @@ ENV NODE_ENV=production
 ENV NETWORK_CONFIG=/app/my_first_network/network.yaml
 ENV AGENTS_DIR=/app/my_first_network/agents
 ENV TOOLS_DIR=/app/my_first_network/tools
-
-# Agent configuration (read from .env file or set these in docker-compose/deployment)
-ENV NETWORK_HOST=0.0.0.0
-ENV NETWORK_PORT=8700
-ENV NETWORK_ID=cqy-eru-1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
