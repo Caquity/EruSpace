@@ -368,7 +368,7 @@ class NewsAssistantAgent(WorkerAgent):
             msg = "\n📭 No news available\n\n"
             msg += "⚠️ Currently no news content is available\n\n"
             msg += "Please ensure the ntfy listener is running:\n"
-            msg += "  python studio/my_first_network/tools/ntfy_listener.py\n"
+            msg += "  python src/openagents/my_first_network/tools/ntfy_listener.py\n"
             return msg
         
         news_id = news.get('id')

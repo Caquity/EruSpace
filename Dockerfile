@@ -39,6 +39,8 @@ COPY src/ ./src/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
+RUN pip install huggingface_hub
+
 
 # Copy built studio from stage 1 (served via HTTP transport at /studio)
 COPY --from=studio-builder /app/studio/build /app/studio/build
