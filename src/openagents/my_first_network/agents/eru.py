@@ -1,11 +1,19 @@
 import asyncio
 import os
 import logging
+from pathlib import Path
 from dotenv import load_dotenv
 from openagents.agents.worker_agent import WorkerAgent, EventContext, ChannelMessageContext
 from openagents.models.agent_config import AgentConfig
 
-load_dotenv("studio/my_first_network/network_configuration.env")
+# Load .env file from the same directory as network.yaml (parent of agents/)
+env_file = Path(__file__).parent.parent / "network_configuration.env"
+if env_file.exists():
+    load_dotenv(env_file)
+else:
+    # In Docker, environment variables should be set directly
+    print(f"⚠️  .env file not found at {env_file}, using environment variables")
+
 # logging.basicConfig(level=logging.DEBUG)
 
  
