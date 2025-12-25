@@ -20,7 +20,11 @@ echo "🌐 Starting OpenAgents Network on port 8700..."
 echo "   - Studio will be available at /studio"
 echo "   - MCP will be available at /mcp"
 echo "   - gRPC transport on port 8600"
-openagents network start /network &
+
+# Use custom network config from environment variable or default
+NETWORK_CONFIG=${NETWORK_CONFIG:-/network}
+echo "📝 Using network configuration: $NETWORK_CONFIG"
+openagents network start "$NETWORK_CONFIG" &
 NETWORK_PID=$!
 
 # Wait for network to be ready
@@ -36,6 +40,33 @@ for i in {1..30}; do
     fi
     sleep 1
 done
+
+# Auto-start agents if AGENTS_DIR is set and exists
+if [ -n "$AGENTS_DIR" ] && [ -d "$AGENTS_DIR" ]; then
+    echo "🤖 Auto-starting agents from: $AGENTS_DIR"
+    
+    # Start Python agents (*.py files)
+    for agent_file in "$AGENTS_DIR"/*.py; do
+        if [ -f "$agent_file" ]; then
+            agent_name=$(basename "$agent_file" .py)
+            echo "   ▶️  Starting Python agent: $agent_name"
+            python "$agent_file" &
+            sleep 2  # Small delay between agent starts
+        fi
+    done
+    
+    # Start YAML agents (*.yaml files)
+    for agent_file in "$AGENTS_DIR"/*.yaml; do
+        if [ -f "$agent_file" ]; then
+            agent_name=$(basename "$agent_file" .yaml)
+            echo "   ▶️  Starting YAML agent: $agent_name"
+            openagents agent start "$agent_file" &
+            sleep 2  # Small delay between agent starts
+        fi
+    done
+    
+    echo "✅ All agents started!"
+fi
 
 echo ""
 echo "✅ OpenAgents is running!"

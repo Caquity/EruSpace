@@ -36,18 +36,16 @@ RUN apt-get update && apt-get install -y \
 # Copy Python project files
 COPY pyproject.toml setup.py setup.cfg MANIFEST.in ./
 COPY src/ ./src/
-COPY src/openagents/my_first_network /app/src/openagents/my_first_network
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
 RUN pip install huggingface_hub
 
-
 # Copy built studio from stage 1 (served via HTTP transport at /studio)
 COPY --from=studio-builder /app/studio/build /app/studio/build
 
-# Copy network configuration
-COPY examples/default_network/ /network/
+# Copy your custom network configuration
+COPY src/openagents/my_first_network/ /app/my_first_network/
 
 # Copy startup script
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
@@ -64,6 +62,8 @@ EXPOSE 8700 8600
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV NODE_ENV=production
+ENV NETWORK_CONFIG=/app/my_first_network/network.yaml
+ENV AGENTS_DIR=/app/my_first_network/agents
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
