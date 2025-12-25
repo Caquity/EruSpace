@@ -64,6 +64,7 @@ ENV PYTHONUNBUFFERED=1
 ENV NODE_ENV=production
 ENV NETWORK_CONFIG=/app/my_first_network/network.yaml
 ENV AGENTS_DIR=/app/my_first_network/agents
+ENV TOOLS_DIR=/app/my_first_network/tools
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

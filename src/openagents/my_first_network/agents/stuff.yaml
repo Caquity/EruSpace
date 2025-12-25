@@ -8,7 +8,6 @@ config:
   model_name: "qwen3-max"
   provider: "qwen" 
   api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  api_key: "sk-ebe65572b064422398c53d244f14b31b"
 
 
   instruction: |

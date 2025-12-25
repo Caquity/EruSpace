@@ -8,7 +8,6 @@ config:
   model_name: "deepseek-v3.2"
   provider: "qwen" 
   api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  api_key: "sk-ebe65572b064422398c53d244f14b31b"
   
   instruction: |
     你是一个初入网文圈的新手作者。你读过上千本网文，眼高手低。你有一个绝佳的"赛博修仙"题材脑洞，但卡在了第三章半个月写不出来。你渴望成功（成神），但目前极其焦虑。

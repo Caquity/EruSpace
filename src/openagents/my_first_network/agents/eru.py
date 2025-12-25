@@ -27,7 +27,10 @@ class AIAssistant(WorkerAgent):
         await ws.agent(msg.source_id).send(f"Hello {msg.source_id}!")
     
     async def on_channel_post(self, msg: ChannelMessageContext):
-        """Monitor channel posts for help requests"""
+        """Monitor channel posts for help requests - ONLY in #Home channel"""
+        if msg.channel != "Home":
+            return
+        
         await self.run_agent(
             context=msg,
             instruction="Reply to the message with a short response"

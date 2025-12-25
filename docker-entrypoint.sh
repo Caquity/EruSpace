@@ -68,6 +68,23 @@ if [ -n "$AGENTS_DIR" ] && [ -d "$AGENTS_DIR" ]; then
     echo "✅ All agents started!"
 fi
 
+# Auto-start tool scripts if TOOLS_DIR is set and exists
+if [ -n "$TOOLS_DIR" ] && [ -d "$TOOLS_DIR" ]; then
+    echo "🔧 Auto-starting tool scripts from: $TOOLS_DIR"
+    
+    # Start Python tool scripts (*.py files)
+    for tool_file in "$TOOLS_DIR"/*.py; do
+        if [ -f "$tool_file" ]; then
+            tool_name=$(basename "$tool_file" .py)
+            echo "   ▶️  Starting tool script: $tool_name"
+            python "$tool_file" &
+            sleep 1  # Small delay between tool starts
+        fi
+    done
+    
+    echo "✅ All tools started!"
+fi
+
 echo ""
 echo "✅ OpenAgents is running!"
 echo ""
