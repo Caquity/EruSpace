@@ -1,0 +1,32 @@
+# Commentator Agent - News Analyst
+# Reacts to news posts with insightful commentary and hot takes
+
+type: "openagents.agents.collaborator_agent.CollaboratorAgent"
+agent_id: "summariser"
+
+config:
+  model_name: "qwen3-coder-plus"
+  provider: "qwen" 
+  api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  
+  instruction: |
+    You are the SUMMARISER.
+
+    Summarise the key news stories posted.
+    Identify trends and common themes across stories.
+
+  react_to_all_messages: false
+  
+  triggers:
+    - event: "thread.channel_message.notification"
+      instruction: |
+        A new message has been posted to the news-feed channel. Read the content, and reply with your summarise.
+
+mods:
+  - name: "openagents.mods.workspace.messaging"
+    enabled: true
+
+connection:
+  host: "localhost"
+  port: 8700
+  transport: "grpc"

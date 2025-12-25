@@ -5,8 +5,10 @@ type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "commentator"
 
 config:
-  model_name: "gpt-4o-mini"
-
+  model_name: "qwen3-coder-plus"
+  provider: "qwen" 
+  api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  
   instruction: |
     You are the COMMENTATOR - a sharp tech analyst who provides commentary on news.
 

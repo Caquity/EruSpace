@@ -5,7 +5,7 @@ type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "web-searcher"
 
 config:
-  model_name: "gpt-4o-mini"
+  model_name: "qwen-flash"
 
   # CRITICAL: Limit tool calls to prevent duplicates
   max_iterations: 5
@@ -14,7 +14,7 @@ config:
   tools:
     - name: "search_web"
       description: "Search the web for information. Uses Brave Search if BRAVE_API_KEY is set, otherwise uses DuckDuckGo."
-      implementation: "tools.web_search.search_web"
+      implementation: "demos.03_research_team.tools.web_search.search_web"
       input_schema:
         type: object
         properties:
@@ -29,7 +29,7 @@ config:
 
     - name: "fetch_webpage"
       description: "Fetch and extract text content from a webpage URL."
-      implementation: "tools.web_search.fetch_webpage"
+      implementation: "demos.03_research_team.tools.web_search.fetch_webpage"
       input_schema:
         type: object
         properties:
@@ -44,7 +44,7 @@ config:
 
     - name: "search_hackernews"
       description: "Search Hacker News for discussions and articles on a topic."
-      implementation: "tools.web_search.search_hackernews"
+      implementation: "demos.03_research_team.tools.web_search.search_hackernews"
       input_schema:
         type: object
         properties:

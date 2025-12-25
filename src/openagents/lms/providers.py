@@ -349,7 +349,7 @@ class GeminiProvider(BaseModelProvider):
                 "google-generativeai package is required for Gemini provider. Install with: pip install google-generativeai"
             )
 
-        api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        api_key = api_key or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
         self.client = genai.GenerativeModel(model_name)
 

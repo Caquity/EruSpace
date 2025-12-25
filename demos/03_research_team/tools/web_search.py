@@ -24,9 +24,11 @@ def search_web(query: str, count: int = 5) -> str:
     # Try Brave Search first if API key is available
     brave_key = os.environ.get("BRAVE_API_KEY")
     if brave_key:
+        print("🎉🎉🎉Using Brave Search API🎉🎉🎉")
         return _search_brave(query, count, brave_key)
 
     # Fall back to DuckDuckGo Instant Answers
+    print("--------------------Failed to load brave api key-----------------")
     return _search_duckduckgo(query, count)
 
 

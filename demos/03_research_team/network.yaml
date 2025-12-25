@@ -7,6 +7,7 @@ network:
   mode: "centralized"
   node_id: "research-team-1"
 
+
   # Transport configuration
   transports:
     - type: "http"

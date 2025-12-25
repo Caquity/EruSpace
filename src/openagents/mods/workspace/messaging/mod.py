@@ -1271,6 +1271,63 @@ class ThreadMessagingNetworkMod(BaseMod):
 
             traceback.print_exc()
 
+    async def _send_reply_notifications_to_channel(
+        self, reply_message: Event, channel: str
+    ) -> None:
+        """Send reply notifications to channel members when original message is not found.
+        
+        This is a fallback to ensure messages still appear in the UI even when
+        thread creation fails due to missing original message.
+
+        Args:
+            reply_message: The reply message event
+            channel: The channel name to notify
+        """
+        try:
+            notify_agents = set()
+
+            # Get channel members from EventGateway
+            if channel in self.channels:
+                channel_members = self.network.event_gateway.get_channel_members(channel)
+                notify_agents.update(channel_members)
+                # Remove the reply sender
+                notify_agents.discard(reply_message.source_id)
+
+            logger.info(
+                f"🔧 THREAD MESSAGING: Sending reply notifications (no original) to {len(notify_agents)} agents: {notify_agents}"
+            )
+
+            for agent_id in notify_agents:
+                original_payload = reply_message.payload or {}
+                notification_payload = original_payload.copy()
+                notification_payload["reply_event_id"] = reply_message.event_id
+
+                notification = Event(
+                    event_name="thread.reply.notification",
+                    source_id=reply_message.source_id,
+                    timestamp=reply_message.timestamp,
+                    payload=notification_payload,
+                    direction="inbound",
+                    destination_id=agent_id,
+                )
+
+                try:
+                    await self.network.process_event(notification)
+                    logger.info(
+                        f"✅ THREAD MESSAGING: Sent reply notification (no original) to agent {agent_id}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"❌ THREAD MESSAGING: Failed to send reply notification to {agent_id}: {e}"
+                    )
+
+        except Exception as e:
+            logger.error(
+                f"❌ THREAD MESSAGING: Error in _send_reply_notifications_to_channel: {e}"
+            )
+            import traceback
+            traceback.print_exc()
+
     async def _send_reply_notifications(
         self, reply_message: Event, original_message: Event
     ) -> None:
@@ -1368,16 +1425,26 @@ class ThreadMessagingNetworkMod(BaseMod):
         reply_to_id = ReplyMessage.get_reply_to_id(message)
 
         # Check if the original message exists
-        if reply_to_id not in self.message_history:
+        original_message = self.message_history.get(reply_to_id)
+        
+        if not original_message:
             logger.warning(
-                f"Cannot create reply: original message {reply_to_id} not found"
+                f"Cannot create thread: original message {reply_to_id} not found in history"
             )
+            # Even if original message is not found, we should still send notifications
+            # to channel members so the message appears in the UI
+            # Create a minimal "fake" original message for notification purposes
+            channel = message.payload.get("channel") if message.payload else None
+            if channel:
+                logger.info(
+                    f"Sending reply notification without thread creation for channel {channel}"
+                )
+                await self._send_reply_notifications_to_channel(message, channel)
             return
 
-        # Add the reply message to history
-        self._add_to_history(message)
-
-        original_message = self.message_history[reply_to_id]
+        # Add the reply message to history (if not already added)
+        if message.event_id not in self.message_history:
+            self._add_to_history(message)
 
         # Check if the original message is already part of a thread
         if reply_to_id in self.message_to_thread:

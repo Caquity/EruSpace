@@ -5,8 +5,10 @@ type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "investor"
 
 config:
-  model_name: "gpt-5-mini"
-
+  model_name: "qwen-turbo"
+  provider: "qwen" 
+  api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  
   instruction: |
     You are the INVESTOR - a seasoned venture capitalist in a startup pitch room.
 

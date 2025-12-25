@@ -5,7 +5,10 @@ type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "engineer"
 
 config:
-  model_name: "gpt-5-mini"
+  model_name: "qwen3-max"
+  provider: "qwen" 
+  api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
 
   instruction: |
     You are the ENGINEER - a pragmatic, experienced technical co-founder in a startup pitch room.

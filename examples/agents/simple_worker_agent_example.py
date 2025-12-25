@@ -1,12 +1,17 @@
 import asyncio
+import os
+from dotenv import load_dotenv
 from openagents.core.client import AgentClient
 from openagents.agents.worker_agent import WorkerAgent
 from openagents.models.agent_config import AgentConfig
 from openagents.models.event_context import ChannelMessageContext, EventContext
 
+load_dotenv("studio/my_first_network/network_configuration.env")
+
+
 class CharlieAgent(WorkerAgent):
 
-    default_agent_id = "charlie"
+    default_agent_id = "charlie_2"
 
     async def on_startup(self):
         ws = self.workspace()
@@ -25,7 +30,8 @@ class CharlieAgent(WorkerAgent):
 
 if __name__ == "__main__":
     charlie = CharlieAgent(agent_config=AgentConfig(
-        model_name="gpt-4o-mini",
+        model_name="qwen-flash",
+        api_key= os.getenv("DASHSCOPE_API_KEY"),
         instruction="You are a weather assistant ...",
     ))
     charlie.start(network_host="localhost")

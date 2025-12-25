@@ -818,6 +818,7 @@ class ForumNetworkMod(BaseMod):
         topic = self._load_topic(topic_id)
         if not topic:
             return EventResponse(success=False, message="Topic not found")
+        
 
         # Check if agent can view the topic
         if not self._can_agent_view_topic(author_id, topic):

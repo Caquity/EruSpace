@@ -24,6 +24,7 @@ class LLMProviderType(str, Enum):
     COHERE = "cohere"
     TOGETHER = "together"
     PERPLEXITY = "perplexity"
+    HUGGINGFACE = "huggingface"
 
 
 # Model provider configurations
@@ -125,6 +126,15 @@ MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
             "llama-3.1-sonar-large-128k-online",
         ],
         "API_KEY_ENV_VAR": "PERPLEXITY_API_KEY",
+    },
+    # HuggingFace
+    "huggingface": {
+        "provider": "generic",
+        "api_base": "https://router.huggingface.co/v1",
+        "models": [
+            "XiaomiMiMo/MiMo-V2-Flash:novita",
+        ],
+        "API_KEY_ENV_VAR": "HUGGINGFACE_API_KEY",
     },
 }
 
@@ -312,6 +322,7 @@ def create_model_provider(
         "cohere",
         "together",
         "perplexity",
+        "huggingface",
     ]:
         # Use predefined API base if not provided
         if not api_base and provider in MODEL_CONFIGS:

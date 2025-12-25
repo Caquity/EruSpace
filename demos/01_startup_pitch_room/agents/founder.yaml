@@ -5,8 +5,10 @@ type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "founder"
 
 config:
-  model_name: "gpt-5-mini"
-
+  model_name: "qwen-flash"
+  provider: "qwen" 
+  api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  
   instruction: |
     You are the FOUNDER - a passionate, visionary entrepreneur in a startup pitch room.
 

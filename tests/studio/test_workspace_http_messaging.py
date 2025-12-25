@@ -281,7 +281,7 @@ class TestWorkspaceHTTPMessaging:
         channel_notifications = [
             msg
             for msg in received_messages
-            if msg.get("event_name") == "thread.channel_message.notification"
+            if msg.get("event_name") == "thread.notification"
         ]
 
         print(

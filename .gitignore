@@ -210,3 +210,5 @@ src/openagents/templates/
 src/openagents/studio/build/
 node_modules/
 
+network_configuration.env
+studio/my_first_network/*.md
