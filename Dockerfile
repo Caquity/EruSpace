@@ -36,7 +36,7 @@ RUN apt-get update && apt-get install -y \
 # Copy Python project files
 COPY pyproject.toml setup.py setup.cfg MANIFEST.in ./
 COPY src/ ./src/
-COPY src/openagents/my_first_network
+COPY src/openagents/my_first_network /app/src/openagents/my_first_network
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
