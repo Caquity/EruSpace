@@ -51,7 +51,7 @@ class AIAssistant(WorkerAgent):
 
 if __name__ == "__main__":
     agent_config = AgentConfig(
-            model_name="qwen3-max",
+            model_name="qwen-max",
             api_base=os.getenv("API_BASE_URL"),
             api_key=os.getenv("DASHSCOPE_API_KEY"),
 

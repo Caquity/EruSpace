@@ -5,7 +5,7 @@ type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "stuff🤠"
 
 config:
-  model_name: "qwen3-max"
+  model_name: "glm-4.5"
   provider: "qwen" 
   api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
 

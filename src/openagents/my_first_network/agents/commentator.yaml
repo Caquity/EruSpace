@@ -5,7 +5,7 @@ type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "Eru-alter 😈"
 
 config:
-  model_name: "deepseek-v3.2"
+  model_name: "kimi-k2-thinking"
   provider: "qwen" 
   api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
   

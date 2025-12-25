@@ -53,7 +53,7 @@ class AIAssistant(WorkerAgent):
 
 if __name__ == "__main__":
     agent_config = AgentConfig(
-            model_name="qwen3-max",
+            model_name="deepseek-v3.2-exp",
             api_base=os.getenv("API_BASE_URL"),
             api_key=os.getenv("DASHSCOPE_API_KEY"),
             # model_name="Gemini 2.5 Flash-Lite",
