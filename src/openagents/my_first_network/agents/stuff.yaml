@@ -57,6 +57,7 @@ config:
   triggers:
     - event: "thread.channel_message.notification"
       instruction: |
+        ONLY respond if the channel is: ["EASTER-EGG"]
         如果 sender_id 或 Source 是 "client"，用 reply_channel_message 回复，简短一句。如果不是对方，立即结束，不要回复。
     - event: "thread.replay.*"
       
