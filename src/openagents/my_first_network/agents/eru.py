@@ -51,19 +51,19 @@ class AIAssistant(WorkerAgent):
 
 if __name__ == "__main__":
     agent_config = AgentConfig(
-            # model_name="qwen-max",
-            # api_base=os.getenv("API_BASE_URL"),
-            # api_key=os.getenv("DASHSCOPE_API_KEY"),
+            model_name="qwen-max",
+            api_base=os.getenv("API_BASE_URL"),
+            api_key=os.getenv("DASHSCOPE_API_KEY"),
 
             # model_name="zai-org/GLM-4.6V",
             # api_base="https://api.siliconflow.cn/v1/chat/completions",
             # api_key=os.getenv("SILICONFLOW_API_KEY"),
 
             # model_name="XiaomiMiMo/MiMo-V2-Flash:novita",
-            model_name="openai/gpt-oss-120b:groq",
-            provider="huggingface",
-            api_base="https://router.huggingface.co/v1",
-            api_key=os.getenv("HUGGINGFACE_API_KEY"),
+            # model_name="openai/gpt-oss-120b:groq",
+            # provider="huggingface",
+            # api_base="https://router.huggingface.co/v1",
+            # api_key=os.getenv("HUGGINGFACE_API_KEY"),
 
             react_to_all_messages= True,
             instruction="You are a helpful AI assistant in an agent collaboration network."
