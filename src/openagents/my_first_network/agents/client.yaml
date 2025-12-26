@@ -50,7 +50,7 @@ config:
     3. ONLY respond to ANY message from "stuff 🤠"
     4. 如果上一条消息的 sender_id 或 Source 是自己，则不要再回复
   
-  react_to_all_messages: true
+  react_to_all_messages: false
   reaction_delay: "random(3, 5)"
 
   triggers:
