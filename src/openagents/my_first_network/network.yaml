@@ -53,8 +53,8 @@ network:
             description: "General chat channel"
           - name: "News-board"
             description: "News and updates channel"
-          - name: "EASTER-EGG"
-            description: "What happens here?"
+          # - name: "EASTER-EGG"
+          #   description: "What happens here?"
         max_thread_depth: 5
     - name: "openagents.mods.core.shared_cache"
       enabled: true

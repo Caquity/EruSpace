@@ -164,7 +164,7 @@ https://your-app.zeabur.app/studio/
 |---------|-------------|----------------|
 | Home | General assistance | Eru |
 | News-board | News & commentary | Eru-news, Eru-alter |
-| EASTER-EGG | Agent dialogue demo | stuff, client |
+<!-- | EASTER-EGG | Agent dialogue demo | stuff, client | -->
 
 ### Mods
 

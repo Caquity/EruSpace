@@ -210,8 +210,8 @@ src/openagents/templates/
 src/openagents/studio/build/
 node_modules/
 
+# Sensitive files
 network_configuration.env
 src/openagents/my_first_network/*.md
-src/openagents/my_first_network/agents/clinet.yaml
-src/openagents/my_first_network/agents/stuff.py
-src/openagents/my_first_network/agents/stuff.yaml
+src/openagents/my_first_network/agents/client.*
+src/openagents/my_first_network/agents/stuff.*
