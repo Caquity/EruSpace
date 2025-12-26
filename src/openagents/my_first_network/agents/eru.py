@@ -51,13 +51,14 @@ class AIAssistant(WorkerAgent):
 
 if __name__ == "__main__":
     agent_config = AgentConfig(
-            model_name="qwen-max",
-            api_base=os.getenv("API_BASE_URL"),
-            api_key=os.getenv("DASHSCOPE_API_KEY"),
+            # model_name="qwen-max",
+            # api_base=os.getenv("API_BASE_URL"),
+            # api_key=os.getenv("DASHSCOPE_API_KEY"),
 
-            # model_name="zai-org/GLM-4.6V",
-            # api_base="https://api.siliconflow.cn/v1/chat/completions",
-            # api_key=os.getenv("SILICONFLOW_API_KEY"),
+            model_name="zai-org/GLM-4.6V",
+            provider="siliconflow",
+            api_base="https://api.siliconflow.cn/v1",
+            api_key=os.getenv("SILICONFLOW_API_KEY"),
 
             # model_name="XiaomiMiMo/MiMo-V2-Flash:novita",
             # model_name="openai/gpt-oss-120b:groq",

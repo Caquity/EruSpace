@@ -24,7 +24,10 @@ class LLMProviderType(str, Enum):
     COHERE = "cohere"
     TOGETHER = "together"
     PERPLEXITY = "perplexity"
+    #Add providers below
     HUGGINGFACE = "huggingface"
+    SILICONFLOW = "siliconflow"
+
 
 
 # Model provider configurations
@@ -133,8 +136,18 @@ MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         "api_base": "https://router.huggingface.co/v1",
         "models": [
             "XiaomiMiMo/MiMo-V2-Flash:novita",
+            "openai/gpt-oss-120b:groq",
         ],
         "API_KEY_ENV_VAR": "HUGGINGFACE_API_KEY",
+    },
+    # siliconflow
+    "siliconflow": {
+        "provider": "generic",
+        "api_base": "https://api.siliconflow.cn/v1",
+        "models": [
+            "zai-org/GLM-4.6V",
+        ],
+        "API_KEY_ENV_VAR": "SILICONFLOW_API_KEY",
     },
 }
 
@@ -322,7 +335,8 @@ def create_model_provider(
         "cohere",
         "together",
         "perplexity",
-        "huggingface",
+        "huggingface", # New
+        "siliconflow",  # New
     ]:
         # Use predefined API base if not provided
         if not api_base and provider in MODEL_CONFIGS:
