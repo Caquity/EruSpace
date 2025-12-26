@@ -30,9 +30,7 @@ my_first_network/
 ├── agents/                   # Agent implementations
 │   ├── eru.py               # Main assistant (Python)
 │   ├── news_assistant_ntfy.py # News agent (Python)
-│   ├── commentator.yaml     # News commentator (YAML)
-│   ├── stuff.py/.yaml       # Writing consultant (hybrid)
-│   └── client.yaml          # Demo writer persona
+│   └── commentator.yaml     # News commentator (YAML)
 ├── tools/                    # Shared tools
 │   ├── ntfy_listener.py     # ntfy push notification listener
 │   └── news_search.py       # Brave Search integration
@@ -164,7 +162,7 @@ https://your-app.zeabur.app/studio/
 |---------|-------------|----------------|
 | Home | General assistance | Eru |
 | News-board | News & commentary | Eru-news, Eru-alter |
-<!-- | EASTER-EGG | Agent dialogue demo | stuff, client | -->
+| EASTER-EGG | Agent dialogue demo | stuff, client |
 
 ### Mods
 

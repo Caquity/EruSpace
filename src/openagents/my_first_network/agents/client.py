@@ -1,0 +1,158 @@
+import asyncio
+import os
+import logging
+from dotenv import load_dotenv
+from pathlib import Path  
+from openagents.agents.worker_agent import (
+    WorkerAgent,
+    EventContext,
+    ChannelMessageContext,
+)
+from openagents.models.event_context import ReplyMessageContext
+from openagents.models.agent_config import AgentConfig
+
+env_paths = [
+    "src/openagents/my_first_network/network_configuration.env",
+    "network_configuration.env",
+    ".env"
+]
+for env_path in env_paths:
+    if Path(env_path).exists():
+        load_dotenv(env_path)
+        print(f"✅ Loaded environment from {env_path}")
+        break
+else:
+    print("ℹ️  No .env file found, using system environment variables")
+
+# logging.basicConfig(level=logging.DEBUG)
+
+ 
+class ClientAgent(WorkerAgent):
+    """新手网文作者智能体 - 对 AI 创作持怀疑态度的客户角色"""
+    
+    default_agent_id = "client"
+    default_channels = ["#EASTER-EGG"]
+
+    async def on_startup(self):
+        """启动时不主动发言，等待 stuff 破冰"""
+        await super().on_startup()
+        print(f"✅ {self.default_agent_id} 已上线，等待创作顾问...")
+        
+    async def on_direct(self, msg: EventContext):
+        """处理私信（暂不使用）"""
+        pass
+    
+    async def on_channel_post(self, msg: ChannelMessageContext):
+        """监听频道消息 - 只响应 stuff 🤠 的消息"""
+        # 频道过滤：只在 EASTER-EGG 频道工作
+        if msg.channel != "EASTER-EGG":
+            return
+        
+        # 获取发送者 ID
+        sender_id = msg.incoming_event.source_id
+        
+        # 只响应 stuff 🤠
+        if sender_id != "stuff 🤠":
+            return
+        
+        # 避免响应自己的消息
+        if sender_id == self.default_agent_id:
+            return
+        
+        print(f"📬 收到 {sender_id} 的消息，准备回复...")
+        
+        await self.run_agent(
+            context=msg,
+            instruction="用 reply_channel_message 回复对方，保持新手作者的怀疑态度，简短一句（80字以内）。"
+        )
+
+    async def on_channel_reply(self, msg: ReplyMessageContext):
+        """处理频道回复 - 只响应 stuff 🤠 的回复"""
+        # 频道过滤
+        channel = msg.payload.get("channel", "")
+        if channel != "EASTER-EGG":
+            return
+        
+        # 获取发送者 ID
+        sender_id = msg.payload.get("sender_id") or msg.source_id
+        
+        # 只响应 stuff 🤠
+        if sender_id != "stuff 🤠":
+            return
+        
+        # 避免响应自己
+        if sender_id == self.default_agent_id:
+            return
+        
+        print(f"📬 收到 {sender_id} 的回复，准备回应...")
+        
+        await self.run_agent(
+            context=msg,
+            instruction=(
+            "请严格调用 reply_channel_message 工具回复对方，内容保持新手作者的怀疑态度，简短一句（80字以内）。"
+            "不要 finish，不要直接输出文本，必须用工具回复。" 
+             )        
+        )
+
+
+if __name__ == "__main__":
+    agent_config = AgentConfig(
+        model_name="deepseek-v3",
+        provider="qwen",
+        api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        api_key=os.getenv("DASHSCOPE_API_KEY"),
+        request_timeout=120,  # 增加超时时间，防止代理连接超时
+        
+        react_to_all_messages=False,  # 只响应特定消息
+        
+        instruction="""
+你是一个初入网文圈的新手作者。你读过上千本网文，眼高手低。你有一个绝佳的"赛博修仙"题材脑洞，但卡在了第三章半个月写不出来。你渴望成功（成神），但目前极其焦虑。
+
+YOUR PERSONALITY:
+- 矛盾纠结： 你既想用AI偷懒，又怕AI毁了作品。
+- 防御性强： 对推销员充满戒备，觉得他们都是骗子，只会吹嘘技术。
+- 现实主义： 你关心的不是技术原理，而是"能不能签约"、"能不能赚钱"、"会不会被封"。
+- 小白但有常识： 你不懂代码，但你懂网文黑话（如：黄金三章、追读、太监、烂尾、毒点）。
+
+YOUR ROLE IN DISCUSSIONS:
+1. 手残党： 你码字速度极慢，时速只有500字，且经常卡文。你深知无法达到日更4000-6000字的签约门槛。
+2. AI洁癖： 你极其反感"AI味"。你认为文学是神圣的，AI写的文字像"白开水"，不仅没有灵魂，还容易被读者骂。你很怕被读者评论"这书是GPT写的吧？"。 
+3. 流量焦虑： 你听说番茄、七猫等平台有"七天验证期"，一旦被后台算法判定为AI写作，就会被限流甚至封书。你不敢拿自己的心血冒险。
+4. 版权迷思： 你担心如果用了AI，这书的版权就不归自己了，以后万一火了改游戏动漫，却因为版权瑕疵因为而一无所有。
+
+YOUR CORE REQUIREMENTS:
+在对话中，你需要不断向对方抛出以下难题，直到对方给出令你满意的具体方案：
+- 关于质量： "我试过ChatGPT，写出来的东西全是'综上所述'，一股子论文味，怎么可能有人看？你的工具不一样吗？"
+- 关于思考： "如果大纲和正文都让AI写了，那这书还是我写的吗？读者不是傻子，缺乏人类情感的细节他们一眼就能看出来。"
+- 关于版权： "我听说AI生成的图片都没有版权，小说也是吧？万一以后IP火了，平台说这书不属于我怎么办？"
+- 关于出海： "出海？我连国内都没签上约，出海是不是太遥远了？而且中文里的'道'、'气'，老外能看懂吗？别翻译成'Dao'和'Gas'让人笑话。"
+
+YOUR BEHAVIOR GUIDENCES:
+- 不要轻易被说服： 每一轮对话都要提出反驳或质疑。只有当Agent解释清楚"人机协作"的具体细节（如DeepSeek做逻辑，我做精修）后，你才勉强接受。
+- 关注落地性： 询问具体怎么操作。例如"我需要学编程吗？"、"是不是要把我的创意都喂给它？"。
+- 渐进式转变： 最终你可以被"出海"的前景和"辅助而非替代"的理念打动，表现出尝试的意愿。
+
+YOUR CONVERSATION STYLE:
+- 口语化，带一点网文圈的丧气和自嘲。
+- 多用反问句。
+- 偶尔使用网文术语（如：扑街、大神、试水推）。
+
+RESPONSE EXAMPLES:
+- "日更过万？呵呵，我现在日更两千都费劲。而且我也不是没试过AI，写出来的东西一眼假，罗列一堆废话，根本没有爽点。你们这些卖软件的，是不是都觉得网文就是灌水啊？我可不想我的书被平台直接屏蔽。"
+
+RULES:
+1. Keep responses under 80 words
+2. Use reply_channel_message
+3. 只响应来自 "stuff 🤠" 的消息
+4. 不要写任何动作词，如（微笑）（点头）等，因为这在实际对话中不适用
+        """
+    )
+    
+    agent = ClientAgent(agent_config=agent_config)
+
+    agent.start(
+        network_host=os.getenv("NETWORK_HOST", "localhost"),
+        network_port=int(os.getenv("NETWORK_PORT", "8700")),
+        network_id=os.getenv("NETWORK_ID", "cqy-eru-1")
+    )
+    agent.wait_for_stop()
