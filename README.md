@@ -1,6 +1,6 @@
 # EruSpace Agent Network 项目说明文档
 
-![EruSpace](/Users/conqury/openagents/src/openagents/my_first_network/img/EruSpace.png)
+![EruSpace](src/openagents/my_first_network/img/EruSpace.png)
 
 > 基于 OpenAgents 框架的多智能体协作网络系统
 
