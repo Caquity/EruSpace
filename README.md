@@ -69,13 +69,13 @@
 
 **核心组件交互**:
 
-![Architect](/Users/conqury/openagents/src/openagents/my_first_network/img/Architect.png)
+![Architect](src/openagents/my_first_network/img/Architect.png)
 
 ### 系统流程图
 
 **新闻流转流程**:
 
-![System](/Users/conqury/openagents/src/openagents/my_first_network/img/System.png)
+![System](src/openagents/my_first_network/img/System.png)
 
 ---
 
