@@ -48,12 +48,14 @@
 - **通信协议**:
   - HTTP (端口 8700) - Studio + MCP + API
   - gRPC (端口 8600) - 高性能智能体通信
+    
 - **外部服务集成**:
-  - ntfy.sh - 推送通知服务
-  - [TrendRadar - 热点助手 —— 告别无效刷屏，只看真正关心的新闻资讯](https://github.com/sansan0/TrendRadar.git) 
+  - ntfy.sh - 推送通知服务 ⭐️
+  - [TrendRadar - 热点助手 —— 告别无效刷屏，只看真正关心的新闻资讯](https://github.com/sansan0/TrendRadar.git)  ⭐️
   - Brave Search API - 辅助搜索
-  - 新增 `HUGGINGFACE_API_KEY` 支持
-  - 新增 `SILICONFLOW_API_KEY` 支持
+  - 新增 `HUGGINGFACE_API_KEY` 支持 ⭐️
+  - 新增 `SILICONFLOW_API_KEY` 支持 ⭐️
+    
 - **部署方式**:
   - Docker 容器化
   - 云平台支持 (Zeabur)
@@ -165,8 +167,10 @@ Eru-alter → 生成点评并回复
 ## 4. 协作场景与创新点
 
 ### 核心协作场景
+**1: 通用助手**
+1.负责日常会话
 
-**场景 1: 新闻聚合与智能评论**
+**2: 新闻聚合与智能评论**
 
 **流程描述**:
 1. `ntfy_listener` 持续监听 **TrendRadar **推送通知
@@ -177,14 +181,9 @@ Eru-alter → 生成点评并回复
 6. `Eru-alter` 检测到 `Eru-news` 的消息，自动生成点评
 7. 用户同时获得原始新闻 + AI 评论
 
-**创新价值**:
-- **信息过滤**: 避免用户淹没在海量信息中
-- **个性化解读**: AI 提供不同视角的内容解读
-- **自动化流程**: 从获取到评论全流程无人工干预
-
 ---
 
-**场景 2: 智能助手协作模式**
+**Easter Egg🥚: Multi-Agent Communication**
 
 **演示场景** (EASTER-EGG 频道):
 - `stuff 🤠`: AI 创作解决方案顾问
@@ -305,18 +304,11 @@ agent_config = AgentConfig(
    ```
 
 **垂直扩展**:
-1. **增强单个智能体能力**:
-   - 多模型切换 (备用 LLM)
-   - Function Calling 集成
+ **增强单个智能体能力**:
    - RAG (检索增强生成)
 
-2. **性能优化**:
-   - gRPC 流式传输
-   - 消息队列缓冲
-   - 负载均衡
-
 **未来延伸方向**:
-1. **跨网络协作**: 连接多个 OpenAgents 网络
+- **跨网络协作**: 连接多个 OpenAgents 网络
 
 ---
 
@@ -377,11 +369,11 @@ openagents network start \
 
 **Step 4: 启动智能体**
 ```bash
-# 终端 1: 启动 Eru 助手
+# 终端 1: 启动 Eru 
 python src/openagents/my_first_network/agents/eru.py
-# 终端 2: 启动新闻助手
+# 终端 2: 启动Eru-news
 python src/openagents/my_first_network/agents/news_assistant_ntfy.py
-# 终端 3: 启动评论员
+# 终端 3: 启动Eru-alter
 openagents agent start \
   src/openagents/my_first_network/agents/commentator.yaml
 ```
@@ -421,7 +413,7 @@ git push origin main
 ```
 HUGGINGFACE_API_KEY=hf_xxxxx
 DASHSCOPE_API_KEY=sk_xxxxx
-NETWORK_HOST=0.0.0.0
+NETWORK_HOST=localhost
 NETWORK_PORT=8700
 ```
 
@@ -445,7 +437,7 @@ HUGGINGFACE_API_KEY
 
 ------
 
-## 8. 遇到的挑战与解决方案
+## 8. 挑战与解决方案
 
 ### 1: 智能体间数据共享
 
@@ -502,10 +494,8 @@ NtfyNewsStorage.mark_as_sent(news_id)  # 删除 latest_news.json
 ---
 
 ## 9. 未来展望
-
-**功能增强**:
-1. 
-
+1. 更多快速接口，接入各类开源项目
+2. 快速搭建独立RAG库，这正做的每个智能体的独特性
 
 
 ## 相关资源
@@ -523,5 +513,5 @@ NtfyNewsStorage.mark_as_sent(news_id)  # 删除 latest_news.json
 
 **社区资源**:
 
-- 示例项目: `demos/` 目录
-- 博客文章: `changelogs/blogs/`
+- openagents示例项目: `demos/` 目录
+- openagents博客文章: `changelogs/blogs/`
