@@ -69,13 +69,13 @@
 
 **核心组件交互**:
 
-![Architect](src/openagents/my_first_network/img/Architect.png)
+<img src="src/openagents/my_first_network/img/Architect.png" alt="Architect" style="zoom:33%;" />
 
 ### 系统流程图
 
 **新闻流转流程**:
 
-![System](src/openagents/my_first_network/img/System.png alt="Architect" style="zoom:33%;" /)
+![System](src/openagents/my_first_network/img/System.png)
 
 ---
 
