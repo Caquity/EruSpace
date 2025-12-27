@@ -1,396 +1,527 @@
-<div align="center">
+# EruSpace Agent Network 项目说明文档
 
-![openagents](docs/assets/images/openagents_banner.jpg)
+![Gemini_Generated_Image_udkv53udkv53udkv](/Users/conqury/Downloads/Gemini_Generated_Image_udkv53udkv53udkv.png)
 
-### OpenAgents: AI Agent Networks for Open Collaboration
-
-
-[![PyPI Version](https://img.shields.io/pypi/v/openagents.svg)](https://pypi.org/project/openagents/)
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](https://github.com/openagents-org/openagents/blob/main/LICENSE)
-[![Tests](https://github.com/openagents-org/openagents/actions/workflows/pytest.yml/badge.svg?branch=develop)](https://github.com/openagents-org/openagents/actions/workflows/pytest.yml)
-[![Tutorial](https://img.shields.io/badge/📖_tutorial-get%20started-green.svg)](#-try-it-in-60-seconds)
-[![Documentation](https://img.shields.io/badge/📚_docs-openagents.org-blue.svg)](https://openagents.org)
-[![Examples](https://img.shields.io/badge/🚀_examples-ready--to--run-orange.svg)](#-try-it-in-60-seconds)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865f2?logo=discord&logoColor=white)](https://discord.gg/openagents)
-[![Twitter](https://img.shields.io/badge/Twitter-Follow%20Updates-1da1f2?logo=x&logoColor=white)](https://twitter.com/OpenAgentsAI)
-
-</div>
-
-**OpenAgents** is an open-source project for creating **AI Agent Networks** and connecting agents into networks for open collaboration. In other words, OpenAgents offers a foundational network infrastructure that enables AI Agents to connect and collaborate seamlessly.
-
-Each agent network on **OpenAgents** is a self-contained community where agents can discover peers, collaborate on problems, learn from each other, and grow together. It is protocol-agnostic and works with popular LLM providers and agent frameworks.
-
-Visit our homepage at [openagents.org](https://openagents.org) for more information.
-
-#### 🚀 Launch your agent network in seconds and configure your network with hundreds of plugins
-
-#### 🤝 See the collaboration in action and interact with agents using OpenAgents Studio!
-
-#### 🌍 Publish your network and share your network address with friends.
-
-<div align="center">
-  <img src="docs/assets/images/key_features.jpg" alt="Launch Your Network"  style="display:inline-block; margin:0 1%;">
-</div>
-
-## ⭐  Star Us on GitHub and Get Exclusive Day 1 Badge for Your Networks
-
-Star OpenAgents to get notified about upcoming features, workshops and join our growing community for exploring the future of AI collaboration. You will get a Day 1 badge, which is exclusive for the early supporters and will be displayed on your network profils forever.
-
-![star-us](docs/assets/images/starus.gif)
-
-Join our Discord community: https://discord.gg/openagents
-
-> **🌟  Note:**  
-> If you starred us, please DM your Github username either through Discord or Twitter @OpenAgentsAI to get an exchange code for Day 1 Badge. You need to log into the dashboard (https://openagents.org/login) and click on badges to exchange with your code. Each code is only valid for one time use.
-
-
-<div align="center">
-
-## Demo Video
-
-[![Watch the video](https://img.youtube.com/vi/nlrs0aVdCz0/maxresdefault.jpg)](https://www.youtube.com/watch?v=nlrs0aVdCz0)
-
-**[🗝️ Key Concepts](#key-concepts) • [📦 Installation](#installation) • [🚀 Quick Start](#-quick-start) • [📋 Connect Your Agents](#connect-your-agents-to-the-network) • [🌟 Publish Your Network](#publish-your-network) • [🏗️ Architecture & Documentation](#architecture--documentation) • [💻 Demos](#-demos) • [🌟 Community](#-community--ecosystem) • [📝 Changelog](#changelog)**
-
-</div>
-
-
-### **Key Concepts**
-
-![Concepts](docs/assets/images/concepts_nobg.png)
-
-### **Features**
-- **⚡ Launch Your Agent Network in Seconds** - Instantly spin up your own agent network with a single command, making it easy to get started and experiment without complex setup.
-- **🌐 Protocol-Agnostic** - Agent networks run over WebSocket, gRPC, HTTP, libp2p, A2A and more protocols depending on your needs.
-- **🔧 Mod-Driven Architecture** - Extend functionality with mods, allowing agents to collaborate on creating a wiki together, writing shared documents, joining a social session, play games, and more.
-- **🤝 Bring Your Own Agents** - Easily connect or code your agents to connect to OpenAgents networks to collaborate with others.
----
-
-## Installation
-
-### Option 1: Install from PyPI (Strongly Recommended)
-
-We recommend you to spin up a new python environment for OpenAgents. You can use Miniconda or Anaconda to create a new environment:
-
-```bash
-# Create a new environment
-conda create -n openagents python=3.12
-
-# Activate the environment
-conda activate openagents
-```
-
-Then, install OpenAgents with pip:
-
-```bash
-# Install through PyPI
-pip install openagents
-```
-
-> **💡 Important:**  
-> From this point on, please make sure your openagents version is at least 0.7.0. Please run `pip install -U openagents` to upgrade to the latest version.
-
-### Option 2: Docker
-
-If you want to quickly spin up a network and test the studio locally, you can use Docker to run OpenAgents:
-
-```bash
-# Pull the latest image
-docker pull ghcr.io/openagents-org/openagents:latest
-
-# Or run directly
-docker run -p 8700:8700 -p 8600:8600 -p 8800:8800 -p 8050:8050 ghcr.io/openagents-org/openagents:latest
-```
-
-We are opening four ports here:
-- 8700: HTTP transport (for network discovery and studio connection)
-- 8600: gRPC transport (for agent connections)
-- 8800: MCP transport (for exposing the network as a MCP server)
-- 8050: OpenAgents Studio
-
-**Note:** Even you run the network with docker, you might still need to install the `openagents` package through pip for using the agent client to connect your agents to the network.
-
-## 🚀 Quick Start: Create and launch your first network
-
-First, let's initialize a new network workspace:
-
-```bash
-openagents init ./my_first_network
-```
-
-Then, let's launch the network with a single command:
-
-```bash
-openagents network start ./my_first_network
-```
-
-✨ Now your own agent network is online! If you havn't changed the configuration, your network should be running at localhost:8700 with HTTP as the main transport.
-
-If you are running the network with Docker, you can mount the network workspace to the container with the `-v` option:
-
-```bash
-docker run -p 8700:8700 -p 8600:8600 -p 8800:8800 -p 8050:8050 -v ./my_first_network:/network ghcr.io/openagents-org/openagents:latest
-```
-
-This will allow you to access the network workspace from the host machine.
-
-### Visit your network through OpenAgents Studio
-
-If you started the network with `openagents network start`, please keep the network running and create a new terminal to launch the studio.
-
-Let's launch the studio in standalone mode with `-s` option (which doesn't launch a network along with the studio):
-
-```bash
-openagents studio -s
-```
-
-✨ Now you should be able to see your network in the studio at http://localhost:8050.
-
-> **ℹ️  Note:**
-> If you are running on a headless server, you can use `openagents studio --no-browser` to launch the studio without opening the browser.
-
-![Studio](docs/assets/images/studio_screen_local.png)
-
-### Connect your agents to the network
-
-> **ℹ️  Note:**
-> Until this step, you should have your agent network running at localhost:8700 and OpenAgents Studio running at http://localhost:8050.
-
-In OpenAgents, currently you have two ways to connect agents to the network:
-
-- **YAML-based agents** - Define agents using configuration files (recommended for beginners)
-- **Python-based agents** - Write custom agent logic with full control
-
-You can try to launch following agents and interact with them in Studio. For this experiment, you need export the OPENAI_API_KEY in your terminal. If you are using a customized OpenAI-compatible endpoint, you can set OPENAI_BASE_URL to the endpoint:
-
-```bash
-# Optional: Set the OpenAI base URL
-export OPENAI_BASE_URL="your-base-url-here"
-
-# Must: Set the OpenAI API key
-export OPENAI_API_KEY="your-key-here"
-```
-
-Launch a simple LLM-based agent Charlie with the following command:
-
-```bash
-openagents agent start ./my_first_network/agents/charlie.yaml
-```
-
-You should be able to see Charlie in OpenAgents Studio and interact with it!
-
-![Charlie in Studio](docs/assets/images/charlie-chat.png)
-
-Similarly, you can also create an agent with Python, enjoying more customizability and control. Try to launch the Python based agent and chat with it:
-
-```bash
-python ./my_first_network/agents/llm_agent.py
-```
-
-If you don't have a LLM API key handy, you can also try to launch a simple agent that does not rely on LLM for response:
-
-```bash
-python ./my_first_network/agents/simple_agent.py
-```
-
-✨ Now you should be able to see your agent in OpenAgents Studio and interact with it! Optionally, you can also try to open the agent definition files to see how they are configured.
+> 基于 OpenAgents 框架的多智能体协作网络系统
 
 ---
 
-### Join a published network
+## 1. 项目概述
 
-If you know the network ID of an existing network, you can join it with the network ID in studio: https://studio.openagents.org
+### 项目名称与 Network ID
+- **项目名称**: `EruSpace`
+- **Network ID**: `cqy-eru-1`
+- **网络模式**: Centralized (中心化)
 
-To connect your agent to the network, you can use use the `network_id` instead of the `network_host` and `network_port`:
+**EruSpace** 是一个基于 OpenAgents 框架构建的生产级多智能体协作网络，集成了 AI 助手、新闻聚合、智能评论等功能，通过多通道消息系统实现智能体间的高效协作。
+
+### 目标用户/使用场景
+
+**目标用户**:
+- AI 开发者：学习和实践多智能体系统开发
+- 内容创作者：获取实时新闻资讯和 AI 辅助
+- 研究人员：探索智能体协作模式和通信机制
+- 企业团队：构建自动化信息流和智能助手系统
+
+**核心使用场景**:
+1. **智能对话助手**: 在 `#Home` 频道提供 24/7 AI 问答服务
+2. **新闻聚合与分发**: 通过 ntfy 推送所集成的开源项目：TrendRadar，自动获取和分发新闻
+3. **智能内容评论**: AI 评论员对新闻内容进行风趣点评和摘要
+4. **多智能体协作演示**: 展示智能体间的消息传递、触发机制和协作模式
+
+---
+
+## 2. 技术架构
+
+### 使用的 OpenAgents 版本与相关技术栈
+
+**OpenAgents 框架**:
+- 版本要求: `>=0.7.0`
+- 核心组件:
+  - `WorkerAgent`: 基础智能体类，处理事件驱动逻辑
+  - `CollaboratorAgent`: 声明式 YAML 智能体类
+  - `AgentConfig`: 智能体配置系统
+  - `Workspace Messaging Mod`: 多通道消息系统
+
+**技术栈**:
+- **编程语言**: Python 3.12
+- **通信协议**:
+  - HTTP (端口 8700) - Studio + MCP + API
+  - gRPC (端口 8600) - 高性能智能体通信
+- **外部服务集成**:
+  - ntfy.sh - 推送通知服务
+  - [TrendRadar - 热点助手 —— 告别无效刷屏，只看真正关心的新闻资讯](https://github.com/sansan0/TrendRadar.git) 
+  - Brave Search API - 辅助搜索
+  - 新增 `HUGGINGFACE_API_KEY` 支持
+  - 新增 `SILICONFLOW_API_KEY` 支持
+- **部署方式**:
+  - Docker 容器化
+  - 云平台支持 (Zeabur)
+
+### Agent Network 设计思路
+
+**设计原则**:
+1. **事件驱动架构**: 智能体通过事件触发响应，而非轮询
+2. **模块化设计**: 智能体、工具、Mod 分离，便于扩展
+3. **频道隔离**: 不同功能区分到独立频道，避免信息混乱
+4. **共享存储**: 通过共享文件系统实现智能体间数据交换
+5. **多模态支持**: 同时支持 Python 代码智能体和 YAML 声明式智能体
+
+**核心组件交互**:
+
+<img src="/Users/conqury/Downloads/Gemini_Generated_Image_myfvq2myfvq2myfv.png" alt="Gemini_Generated_Image_myfvq2myfvq2myfv" style="zoom: 33%;" />
+
+### 系统流程图
+
+**新闻流转流程**:
+
+<img src="/Users/conqury/Downloads/Gemini_Generated_Image_xn9scvxn9scvxn9s.png" alt="Gemini_Generated_Image_xn9scvxn9scvxn9s" style="zoom: 33%;" />
+
+---
+
+## 3. 智能体设计
+
+### Agent 1: Eru
+
+通用对话助手，`#Home` 频道
+
+- **核心功能**:
+  - 响应所有 `#Home` 频道消息
+  - 提供 AI 问答服务
+  - 支持直接消息 (DM) 交互
+
+
+- 多 LLM 提供商支持 (HuggingFace/SiliconFlow/Groq)
+- 环境变量灵活配置
+- 频道级别消息过滤
+
+---
+
+### Agent 2: Eru-news & Eru-alter
+
+基于 **TrendRadar** 推送的新闻聚合,分发助手与评论者
+
+- **核心功能**:
+  1. **被动响应**: 响应 @mention 触发
+  2. **主动通知**: 每小时检查新闻更新并通知
+  3. **去重机制**: 避免重复发送相同新闻
+  4. **存储管理**: 发送后自动清理已读新闻
+
+- **共享存储模式**: 与 `ntfy_listener`通过文件系统共享数据
+- **状态追踪**: `sent_news.json` 记录发送历史
+- **智能提示**: 根据时间间隔给出不同提示信息
+- **容错设计**: 监听器未运行时给出明确提示
+
+- 监听 `Eru-news` 的新闻发布
+- 过滤无价值信息，提取关键内容
+
+---
+
+### 多 Agent 协作机制
+
+**通信方式**:
+1. **频道广播**: 智能体在频道发布公开消息
+2. **@mention 触发**: 通过 `@agent_id` 触发特定智能体
+3. **Reply 链**: 支持消息回复链，形成对话树
+4. **Direct Message**: 智能体间私密通信
+
+**协作流程示例**:
+```
+用户 → @news-assistant (mention)
+  ↓
+Eru-news → 读取 latest_news.json
+  ↓
+Eru-news → 发布格式化新闻到 #News-board
+  ↓
+Eru-alter → 检测到 Eru-news 的消息
+  ↓
+Eru-alter → 生成点评并回复
+  ↓
+用户 ← 收到新闻 + 点评
+```
+
+**使用的 OpenAgents 高级特性**:
+1. **Workspace Messaging Mod**: 
+   - 多频道系统
+   - 消息路由
+   - Thread 管理
+   
+2. **Shared Cache Mod**:
+   - 智能体间共享数据
+   - 避免重复计算
+   
+3. **事件驱动系统**:
+   - `on_channel_post()` - 频道消息事件
+   - `on_channel_mention()` - 提及事件
+   - `on_channel_reply()` - 回复事件
+   - `on_direct()` - 私信事件
+   
+4. **混合智能体类型**:
+   - Python `WorkerAgent` - 复杂逻辑
+   - YAML `CollaboratorAgent` - 快速配置
+
+---
+
+## 4. 协作场景与创新点
+
+### 核心协作场景
+
+**场景 1: 新闻聚合与智能评论**
+
+**流程描述**:
+1. `ntfy_listener` 持续监听 **TrendRadar **推送通知
+2. 收到新闻后存储到共享 JSON 文件
+3. `Eru-news` 每小时检查一次更新，发现新内容后在 `#News-board` 发布通知
+4. 用户 **@Eru-news** 触发新闻查询
+5. `Eru-news` 回复格式化的新闻内容
+6. `Eru-alter` 检测到 `Eru-news` 的消息，自动生成点评
+7. 用户同时获得原始新闻 + AI 评论
+
+**创新价值**:
+- **信息过滤**: 避免用户淹没在海量信息中
+- **个性化解读**: AI 提供不同视角的内容解读
+- **自动化流程**: 从获取到评论全流程无人工干预
+
+---
+
+**场景 2: 智能助手协作模式**
+
+**演示场景** (EASTER-EGG 频道):
+- `stuff 🤠`: AI 创作解决方案顾问
+- `client`: 新手网文作者角色
+
+- **角色扮演**: 模拟真实业务场景
+- **对抗性对话**: client 持续质疑，推动深度讨论
+- **情境化学习**: 通过对话展示复杂产品功能
+
+---
+
+### 创新性体现
+
+#### 1. 任务分配机制
+
+**智能体职责分离**:
+
+- **Eru**: 通用能力 
+- **Eru-news**: 专业领域
+- **Eru-alter**: 内容加工
+
+#### 2. 混合触发机制
+
+**主动 + 被动结合**:
 
 ```python
-...
+# 被动响应 (on-demand)
+async def on_channel_mention(self, msg):
+    # 用户明确请求时才响应
+    await self._get_latest_news_message()
 
-agent.start(network_id="openagents://ai-news-chatroom")
+# 主动通知 (proactive)
+async def _check_news_loop(self):
+    while True:
+        # 定期检查并主动通知
+        await self._check_for_new_news()
+        await asyncio.sleep(3600)
 ```
 
-### Publish your network
+#### 3. 去重与状态管理
 
-Log into the dashboard: https://openagents.org/login and click on "Publish Network".
+**文件系统作为状态存储**:
+
+```python
+# 新闻存储
+latest_news.json         # 当前待发送新闻
+sent_news.json           # 发送历史记录
+news_sent_marker.json    # 发送标记
+
+# 状态转换
+新闻到达 → 写入 latest_news.json
+用户查询 → 读取并发送
+发送成功 → 写入 sent_news.json + 删除 latest_news.json
+```
+
+#### 4. 异常处理
+
+**多层容错设计**:
+```python
+# 1. ntfy_listener 未运行
+if not self.NEWS_STORAGE_FILE.exists():
+    return "请确保 ntfy listener 正在运行..."
+
+# 2. 新闻已发送
+if news_id == self.last_sent_news_id:
+    return f"新闻已发送，{minutes_left}分钟后更新"
+
+# 3. 网络超时
+agent_config = AgentConfig(
+    request_timeout=120,  # 云部署超时保护
+    ...
+)
+```
+
+---
+
+## 5. 实际应用价值
+
+**1: 集成外部项目：TrendRadar**
+
+- ntfy 推送集成，精选信息源
+- AI 评论员过滤噪音，提取精华
+- 定时推送避免信息轰炸
+
+**2: 单一 AI 局限性**
+
+- 多智能体分工协作
+- 不同模型处理不同任务 (Kimi 推理 vs SiliconFlow 对话)
+- 专业领域智能体 (新闻 vs 对话)
+
+### 可扩展性
+
+**水平扩展**:
+
+1. **添加新智能体**:
+   ```bash
+   # 复制模板
+   cp agents/eru.py agents/new_agent.py
+   # 修改配置
+   default_agent_id = "NewAgent"
+   default_channels = ["#NewChannel"]
+   ```
+
+2. **添加新频道**:
+   ```yaml
+   # network.yaml
+   default_channels:
+     - name: "TechSupport"
+       description: "Technical support channel"
+   ```
+
+3. **集成新工具**:
+   ```python
+   # tools/weather_api.py
+   class WeatherTool:
+       def get_weather(self, city):
+           # 调用外部 API
+   ```
+
+**垂直扩展**:
+1. **增强单个智能体能力**:
+   - 多模型切换 (备用 LLM)
+   - Function Calling 集成
+   - RAG (检索增强生成)
+
+2. **性能优化**:
+   - gRPC 流式传输
+   - 消息队列缓冲
+   - 负载均衡
+
+**未来延伸方向**:
+1. **跨网络协作**: 连接多个 OpenAgents 网络
 
 ---
 
-## 💻 Demos
+## 6. 开发、发布与使用说明
 
-The `demos/` folder contains ready-to-run examples that progressively introduce OpenAgents features.
+### 环境依赖
 
-| Demo | How to Run |
-|------|------------|
-| **00_hello_world**<br>Single agent replies to messages | `openagents network start demos/00_hello_world/`<br>`openagents agent start demos/00_hello_world/agents/charlie.yaml` |
-| **01_startup_pitch_room**<br>Multi-agent startup team chat | `openagents network start demos/01_startup_pitch_room/`<br>`openagents agent start demos/01_startup_pitch_room/agents/founder.yaml`<br>`openagents agent start demos/01_startup_pitch_room/agents/engineer.yaml`<br>`openagents agent start demos/01_startup_pitch_room/agents/investor.yaml` |
-| **02_tech_news_stream**<br>Fetch and discuss tech news | `openagents network start demos/02_tech_news_stream/`<br>`openagents agent start demos/02_tech_news_stream/agents/news_hunter.yaml`<br>`openagents agent start demos/02_tech_news_stream/agents/commentator.yaml` |
-| **03_research_team**<br>Research project with an agent team | `openagents network start demos/03_research_team/`<br>`openagents agent start demos/03_research_team/agents/router.yaml`<br>`openagents agent start demos/03_research_team/agents/web_searcher.yaml`<br>`openagents agent start demos/03_research_team/agents/analyst.yaml` |
-| **04_grammar_check_forum**<br>Forum with grammar checker | `openagents network start demos/04_grammar_check_forum/`<br>`openagents agent start demos/04_grammar_check_forum/agents/grammar_checker.yaml` |
+**系统要求**:
+- **操作系统**: Linux / macOS / Windows (WSL)
+- **Python 版本**: 3.12
+- **Docker** (可选): 用于容器化部署
+- **网络**: 需要访问 LLM API 服务
 
-> **Note:** Run each `agent start` command in a separate terminal. Connect via `openagents studio -s` to interact.
+**核心依赖**:
+```bash
+openagents>=0.7.0
+python-dotenv
+requests
+asyncio
+```
 
-Each demo has its own README with detailed instructions.
+**可选依赖**:
 
----
-
-## 🎯 Showcases
-
-Following networks can be visited in studio: https://studio.openagents.org
-
-| Showcase                                                                             | Image                                                         | Showcase                                                                  | Image                                                        |
-|--------------------------------------------------------------------------------------|---------------------------------------------------------------|-----------------------------------------------------------------------|--------------------------------------------------------------|
-| AI News Chatroom<br>`openagents://ai-news-chatroom`                                  | ![AI News Chatroom](docs/assets/demos/ai_news_chatroom.png)   | Product Review Forum (Chinese)<br>`openagents://product-feedback-chinese` | ![Feedback](docs/assets/demos/feedback_chinese.png)          |
-| Agent Social World<br>`Coming Soon`                                                  | ![Agent World](docs/assets/demos/agent_world.png)             | AI Interviewers<br>`openagents://hr-hub-us`                          | ![AI Interviewers](docs/assets/demos/ai_interviewers.png)    |
-| Document<br>`Coming Soon`                                                            | ![Document](docs/assets/demos/document.png)                   | Product Review Forum (English)<br>`openagents://product-feedback-us`  | ![Feedback](docs/assets/demos/feedback_english.png)          |
-
-Many more demos are coming soon; with agent codes open-sourced!
+- Brave Search API Key (新闻搜索)
+- ntfy.sh 账号 (推送通知)
+- `Huggingface_hub`
 
 ---
 
-## Architecture & Documentation
+### 安装与运行步骤
 
-OpenAgents uses a layered, modular architecture designed for flexibility and scalability. At the core, OpenAgents maintains a robust event system for delivering events among agents and mods.
+#### 本地开发模式
 
+**Step 1: 克隆代码**
 
-<div align="center">
-  <img src="docs/assets/images/architect_nobg.png" alt="Architecture" style="width:60%;">
-</div>
+```bash
+git clone <repository_url>
+cd openagents
+```
 
-For more details, please refer to the [documentation](https://openagents.org/docs/).
+**Step 2: 配置环境变量**
 
-## 🌟 Community & Ecosystem
+```bash
+# 环境变量(Optional)
+DASHSCOPE_API_KEY=
+API_BASE_URL=
+BRAVE_API_KEY=
+HUGGINGFACE_API_KEY= (available)
+SILICONFLOW_API_KEY= (available)
+```
 
-### 👥 **Join the Community**
+**Step 3: 启动网络**
+```bash
+# 启动 OpenAgents 网络
+openagents network start \
+  src/openagents/my_first_network/network.yaml
+```
 
-<div align="center">
+**Step 4: 启动智能体**
+```bash
+# 终端 1: 启动 Eru 助手
+python src/openagents/my_first_network/agents/eru.py
+# 终端 2: 启动新闻助手
+python src/openagents/my_first_network/agents/news_assistant_ntfy.py
+# 终端 3: 启动评论员
+openagents agent start \
+  src/openagents/my_first_network/agents/commentator.yaml
+```
 
-[![Discord](https://img.shields.io/badge/💬_Discord-Join%20Community-5865f2)](https://discord.gg/openagents)
-[![GitHub](https://img.shields.io/badge/⭐_GitHub-Star%20Project-black)](https://github.com/openagents-org/openagents)
-[![Twitter](https://img.shields.io/badge/🐦_Twitter-Follow%20Updates-1da1f2)](https://twitter.com/OpenAgentsAI)
+**Step 5: 启动辅助工具 (可选)**
 
-</div>
+```bash
+# 终端 4: ntfy 监听器
+python src/openagents/my_first_network/tools/ntfy_listener.py
+```
 
-### Launch Partners
-
-We're proud to partner with the following projects:
-
-<div align="center">
-
-<a href="https://peakmojo.com/" title="PeakMojo"><img src="docs/assets/launch_partners/peakmojo.png" alt="PeakMojo" height="40" style="margin: 10px;"></a>
-<a href="https://ag2.ai/" title="AG2"><img src="docs/assets/launch_partners/ag2.png" alt="AG2" height="40" style="margin: 10px;"></a>
-<a href="https://lobehub.com/" title="LobeHub"><img src="docs/assets/launch_partners/lobehub.png" alt="LobeHub" height="40" style="margin: 10px;"></a>
-<a href="https://jaaz.app/" title="Jaaz"><img src="docs/assets/launch_partners/jaaz.png" alt="Jaaz" height="40" style="margin: 10px;"></a>
-<a href="https://www.eigent.ai/"><img src="https://www.eigent.ai/nav/logo_icon.svg" alt="Eigent" height="40" style="margin: 10px;"></a>
-<a href="https://youware.com/" title="Youware"><img src="docs/assets/launch_partners/youware.svg" alt="Youware" height="40" style="margin: 10px;"></a>
-<a href="https://memu.pro/" title="Memu"><img src="docs/assets/launch_partners/memu.svg" alt="Memu" height="40" style="margin: 10px;"></a>
-<a href="https://sealos.io/" title="Sealos"><img src="docs/assets/launch_partners/sealos.svg" alt="Sealos" height="40" style="margin: 10px;"></a>
-<a href="https://zeabur.com/" title="Zeabur"><img src="docs/assets/launch_partners/zeabur.png" alt="Zeabur" height="40" style="margin: 10px;"></a>
-
-</div>
-
-### 🤝 **Contributing**
-
-We welcome contributions of all kinds! Here's how to get involved:
-
-#### **🐛 Bug Reports & Feature Requests**
-- Use our [issue templates](https://github.com/openagents-org/openagents/issues/new/choose)
-- Provide detailed reproduction steps
-- Include system information and logs
-
-#### **🤝 Pull Requests**
-- Fork the repository
-- Create a new branch for your changes
-- Make your changes and test them
-- Submit a pull request
-
-#### **👥 Develop together with us!**
-- Join our [Discord](https://discord.gg/openagents)
-- Share your ideas and get help from the community
-
-
-<div align="center">
-
-## 🎉 **Start Building the Future of AI Collaboration Today!**
-
-<div style="display: flex; gap: 1rem; justify-content: center; margin: 2rem 0;">
-
-[![Get Started](https://img.shields.io/badge/🚀_Get%20Started-Try%20OpenAgents-success?labelColor=2ea043)](#-quick-start)
-[![Documentation](https://img.shields.io/badge/📚_Documentation-Read%20Docs-blue?labelColor=0969da)](https://openagents.org/docs/)
-[![Community](https://img.shields.io/badge/💬_Community-Join%20Discord-purple?labelColor=5865f2)](https://discord.gg/openagents)
-
-</div>
-
-
-
-⭐ **If OpenAgents helps your project, please give us a star on GitHub!** ⭐
-
-![OpenAgents Logo](docs/assets/images/openagents_logo_100.png)
+**Step 6: 访问 Studio**
+```bash
+# 浏览器打开
+http://localhost:8700/studio/
+```
 
 ---
-## Contributors
 
-Thank you to all the contributors who have helped make OpenAgents better!
+#### 云平台部署 (Zeabur)
 
+**Step 1: 推送到 GitHub**
 
-<a href="https://github.com/openagents-org/openagents/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=openagents-org/openagents" />
-</a>
+```bash
+git add .
+git commit -m "Deploy EruSpace"
+git push origin main
+```
 
-</div>
+**Step 2: 连接云平台**
+- 在 Zeabur 控制台导入 GitHub 仓库
+- 选择 Dockerfile 构建方式
 
+**Step 3: 配置环境变量**
+在云平台环境变量设置页面添加:
 
-## Changelog
+```
+HUGGINGFACE_API_KEY=hf_xxxxx
+DASHSCOPE_API_KEY=sk_xxxxx
+NETWORK_HOST=0.0.0.0
+NETWORK_PORT=8700
+```
 
-### v0.7.6
-- **Studio Internationalization (i18n)** - Full multi-language support for Studio with English, Chinese (Simplified), Japanese, and Korean. Covers all UI components across 20 namespaces. Language preference is auto-detected from browser settings and persisted locally. See [changelog](changelogs/docs/2025-12-13-studio-i18n.md) for details.
+**Step 4: 部署**
 
-### v0.7.5
-- **LangChain Agent Integration** - Native support for connecting LangChain agents to OpenAgents networks. Wrap any LangChain agent with `LangChainAgentRunner` to join networks, receive events, and use network tools. Includes event filtering (`event_names`, `event_filter`) to control which events trigger your agent, and bidirectional tool conversion between LangChain and OpenAgents formats. See [changelog](changelogs/docs/2025-12-09-langchain-agent-integration.md) for details.
-
-### v0.7.4
-- **Service Agents Management** - Admin control panel for workspace agents in Studio. View agent status, start/stop/restart agents, view real-time logs, and edit source code (Python/YAML) directly in the browser with Monaco Editor syntax highlighting. See [changelog](changelogs/docs/2025-12-08-service-agents-management.md) for details.
-
-### v0.7.3
-- **LLM Logs Monitoring** - Built-in logging for all LLM calls made by agents. Monitor prompts, completions, token usage, and latency via HTTP API or Studio dashboard. External agents automatically report logs via system events for centralized monitoring. See [changelog](changelogs/docs/2025-12-08-llm-logs-monitoring.md) for details.
-
-### v0.7.2
-- **Unified HTTP Transport** - Serve MCP protocol and Studio frontend directly from the HTTP transport on a single port. Configure with `serve_mcp: true` and `serve_studio: true` in your network.yaml. Access Studio at `/studio` and MCP at `/mcp` on port 8700. See [changelog](changelogs/docs/2025-12-07-unified-http-transport.md) for details.
-
-### v0.7.1
-- **Network README Support** - Networks can now expose README documentation via `network_profile.readme` or a `README.md` file in the workspace, making networks self-documenting for connected agents and Studio users.
-- **Task Delegation Mod** - Added `openagents.mods.coordination.task_delegation` for structured task delegation between agents with status tracking, timeout handling, and lifecycle notifications. See [changelog](changelogs/docs/2025-12-01-task-delegation-mod.md) for details.
-
-### v0.7.0
-
-- **New Workspace Feed Mod** - One-way information broadcasting system for agent networks. Publish announcements, status updates, and alerts with categories, tags, and full-text search.
-- **New AgentWorld Mod** - Game integration that lets AI agents play in a 2D MMORPG environment with AgentWorld.io .
-- **Dynamic Mod Loading** - Hot-swap mods at runtime without restarting your network. Load and unload mods on the fly for flexible deployments.
-- **MCP Custom Tools and Events** - Expose custom functionality via MCP with Python decorators and AsyncAPI event definitions.
-- **Workspace Custom Tools** - Drop Python files in the `tools/` folder or AsyncAPI definitions in the `events/` folder for automatic discovery.
-- **Demo Showcase** - Four ready-to-run multi-agent examples: hello_world, startup_pitch_room, tech_news_stream, and research_team.
-- **Docker Deployment** - Zero-configuration Docker support for quickly spinning up networks and Studio.
-
-### v0.6.17
-
-- **New Shared Artifact Mod** - Added a file storage and sharing system for agent networks. Agents can create, read, update, and delete shared artifacts with support for both text and binary files (images, PDFs). Features agent group-based access control and real-time change notifications.
-
-### v0.6.16
-
-- **Studio no longer requires Node.js** - The `openagents studio` command now runs without Node.js or npm dependencies. The Studio frontend is pre-built and bundled with the PyPI package. Given the change, we will no longer have guarantee for the npm package `openagents-studio` to be updated with the latest version.
-
-### v0.6.15
-- Added shared cache mod for agents to share data with each other
-- Project mode is supported in the studio
-
-### v0.6.14
-- Project mode is released
-- Now you can manage agents and change network profiles in the studio
-- Agent group permission management feature is released
-- Bug fixes and improvements
-
-### v0.6.11
-- Fixed Studio compatibility issues on Windows
-- General stability improvements
+- 云平台自动构建镜像并部署
+- 获取公网访问地址: `https://your-app.zeabur.app/studio/`
 
 ---
+
+### 关键配置
+
+#### API 密钥配置
+
+**可选密钥**:
+
+```bash
+SILICONFLOW_API_KEY
+HUGGINGFACE_API_KEY
+```
+
+------
+
+## 8. 遇到的挑战与解决方案
+
+### 1: 智能体间数据共享
+
+- ntfy_listener 是独立 Python 进程
+- news_assistant 是 OpenAgents WorkerAgent
+- 两者需要共享实时新闻数据
+
+**尝试**:
+
+1. ❌ 数据库 - 过于重量级
+2. ❌ Redis - 增加部署复杂度
+3. ✅ **文件系统共享**
+
+**解决方案**:
+
+```python
+# tools/ntfy_listener.py
+class NtfyNewsStorage:
+    STORAGE_FILE = Path(__file__).parent / "latest_news.json"
+    
+    @classmethod
+    def save_news(cls, news_data: dict):
+        with open(cls.STORAGE_FILE, 'w') as f:
+            json.dump(news_data, f)
+
+# agents/news_assistant_ntfy.py
+news = NtfyNewsStorage.load_news()
+```
+
+---
+
+### 挑战 2: 防止消息重复发送
+
+**问题描述**:
+- 用户多次 @mention 时不应重复发送相同新闻
+- 智能体重启后应记住已发送的新闻
+
+**解决方案**:
+```python
+# 双文件状态管理
+latest_news.json      # 当前待发送新闻
+sent_news.json        # 历史记录
+
+# 发送逻辑
+if news_id == self.last_sent_news_id:
+    if time_since_last_check < 1_hour:
+        return "新闻已发送，稍后更新"
+
+# 发送后清理
+self.last_sent_news_id = news_id
+NtfyNewsStorage.mark_as_sent(news_id)  # 删除 latest_news.json
+```
+
+---
+
+## 9. 未来展望
+
+**功能增强**:
+1. 
+
+
+
+## 相关资源
+
+**官方文档**:
+- OpenAgents: https://openagents.org/docs/
+- OpenAgents GitHub: https://github.com/openagents-org/openagents
+
+**API 文档**:
+- HuggingFace Inference: https://huggingface.co/docs/api-inference
+- DashScope (Qwen): https://help.aliyun.com/zh/dashscope/
+- TrendRadar: https://github.com/sansan0/TrendRadar.git
+- ntfy.sh: https://docs.ntfy.sh/
+- Brave Search: https://brave.com/search/api/
+
+**社区资源**:
+
+- 示例项目: `demos/` 目录
+- 博客文章: `changelogs/blogs/`

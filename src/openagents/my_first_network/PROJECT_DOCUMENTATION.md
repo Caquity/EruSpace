@@ -1,5 +1,7 @@
 # EruSpace Agent Network 项目说明文档
 
+![Gemini_Generated_Image_udkv53udkv53udkv](/Users/conqury/Downloads/Gemini_Generated_Image_udkv53udkv53udkv.png)
+
 > 基于 OpenAgents 框架的多智能体协作网络系统
 
 ---
@@ -199,6 +201,7 @@ Eru-alter → 生成点评并回复
 #### 1. 任务分配机制
 
 **智能体职责分离**:
+
 - **Eru**: 通用能力 
 - **Eru-news**: 专业领域
 - **Eru-alter**: 内容加工
