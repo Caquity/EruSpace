@@ -69,7 +69,7 @@
 
 **核心组件交互**:
 
-<img src="src/openagents/my_first_network/img/Architect.png" alt="Architect" style="zoom:33%;" />
+<img src="src/openagents/my_first_network/img/System.png" width="33%">
 
 ### 系统流程图
 
