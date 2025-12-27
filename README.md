@@ -1,6 +1,6 @@
 # EruSpace Agent Network 项目说明文档
 
-![Gemini_Generated_Image_udkv53udkv53udkv](/Users/conqury/Downloads/Gemini_Generated_Image_udkv53udkv53udkv.png)
+![EruSpace](/Users/conqury/openagents/src/openagents/my_first_network/img/EruSpace.png)
 
 > 基于 OpenAgents 框架的多智能体协作网络系统
 
@@ -69,13 +69,13 @@
 
 **核心组件交互**:
 
-<img src="/Users/conqury/Downloads/Gemini_Generated_Image_myfvq2myfvq2myfv.png" alt="Gemini_Generated_Image_myfvq2myfvq2myfv" style="zoom: 33%;" />
+![Architect](/Users/conqury/openagents/src/openagents/my_first_network/img/Architect.png)
 
 ### 系统流程图
 
 **新闻流转流程**:
 
-<img src="/Users/conqury/Downloads/Gemini_Generated_Image_xn9scvxn9scvxn9s.png" alt="Gemini_Generated_Image_xn9scvxn9scvxn9s" style="zoom: 33%;" />
+![System](/Users/conqury/openagents/src/openagents/my_first_network/img/System.png)
 
 ---
 
