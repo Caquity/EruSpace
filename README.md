@@ -69,13 +69,13 @@
 
 **核心组件交互**:
 
-<img src="src/openagents/my_first_network/img/System.png" width="33%">
+<img src="src/openagents/my_first_network/img/Architect.png" width="50%">
 
 ### 系统流程图
 
 **新闻流转流程**:
 
-![System](src/openagents/my_first_network/img/System.png)
+<img src="src/openagents/my_first_network/img/System.png" width="50%">
 
 ---
 
