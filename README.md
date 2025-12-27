@@ -75,7 +75,7 @@
 
 **新闻流转流程**:
 
-![System](src/openagents/my_first_network/img/System.png)
+![System](src/openagents/my_first_network/img/System.png alt="Architect" style="zoom:33%;" /)
 
 ---
 
