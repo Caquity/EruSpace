@@ -69,7 +69,7 @@
 
 **核心组件交互**:
 
-![Architect](/Users/conqury/openagents/src/openagents/my_first_network/img/Architect.png)
+<img src="/Users/conqury/openagents/src/openagents/my_first_network/img/Architect.png" alt="Architect" style="zoom:33%;" />
 
 ### 系统流程图
 

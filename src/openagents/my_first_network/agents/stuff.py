@@ -26,6 +26,11 @@ else:
     
 # logging.basicConfig(level=logging.DEBUG)
 
+# 对话轮数限制
+MAX_DIALOGUE_ROUNDS = 4
+dialogue_round_count = 0  # 全局计数器：stuff 发言一次 + client 回复一次 = 1 轮
+dialogue_ended = False  # 对话是否已结束
+
  
 class AIAssistant(WorkerAgent):
     """An AI-powered assistant agent"""
@@ -61,6 +66,13 @@ class AIAssistant(WorkerAgent):
         )
 
     async def on_channel_reply(self, msg: ReplyMessageContext):
+        global dialogue_round_count, dialogue_ended
+        
+        # 如果对话已结束，不再响应
+        if dialogue_ended:
+            print(f"🛑 对话已结束，不再响应")
+            return
+        
         channel = msg.payload.get("channel", "")
         if channel != "EASTER-EGG":
             return
@@ -74,7 +86,24 @@ class AIAssistant(WorkerAgent):
         if sender_id == self.default_agent_id:
             return
         
-        print(f"📬 收到 {sender_id} 的回复，准备回应...")
+        # client 回复了，说明一轮对话完成，增加计数
+        dialogue_round_count += 1
+        print(f"📬 收到 {sender_id} 的回复（第 {dialogue_round_count} 轮），准备回应...")
+        
+        # 检查是否达到最大轮数
+        if dialogue_round_count >= MAX_DIALOGUE_ROUNDS:
+            dialogue_ended = True
+            print(f"🏁 已达到 {MAX_DIALOGUE_ROUNDS} 轮对话上限，Multi-Agent对话演示完毕")
+            
+            await self.run_agent(
+                context=msg,
+                instruction="""
+这是最后一轮对话。请用 reply_channel_message 发送一段简短的结束语（100字以内），感谢对方的交流，
+总结一下今天讨论的要点，并表示期待未来有机会合作。语气要专业但温暖，不要太正式。
+发送完结束语后，对话将自动结束。
+"""
+            )
+            return
         
         await self.run_agent(
             context=msg,

@@ -26,6 +26,11 @@ else:
 
 # logging.basicConfig(level=logging.DEBUG)
 
+# 对话轮数限制（与 stuff.py 保持同步）
+MAX_DIALOGUE_ROUNDS = 4
+dialogue_round_count = 0  # 全局计数器
+dialogue_ended = False  # 对话是否已结束
+
  
 class ClientAgent(WorkerAgent):
     """新手网文作者智能体 - 对 AI 创作持怀疑态度的客户角色"""
@@ -68,6 +73,13 @@ class ClientAgent(WorkerAgent):
 
     async def on_channel_reply(self, msg: ReplyMessageContext):
         """处理频道回复 - 只响应 stuff 🤠 的回复"""
+        global dialogue_round_count, dialogue_ended
+        
+        # 如果对话已结束，不再响应
+        if dialogue_ended:
+            print(f"🛑 对话已结束，不再响应")
+            return
+        
         # 频道过滤
         channel = msg.payload.get("channel", "")
         if channel != "EASTER-EGG":
@@ -84,7 +96,15 @@ class ClientAgent(WorkerAgent):
         if sender_id == self.default_agent_id:
             return
         
-        print(f"📬 收到 {sender_id} 的回复，准备回应...")
+        # 增加计数（client 收到 stuff 的回复，准备回应）
+        dialogue_round_count += 1
+        print(f"📬 收到 {sender_id} 的回复（第 {dialogue_round_count} 轮），准备回应...")
+        
+        # 检查是否达到最大轮数（此时不回复，等待 stuff 的结束语）
+        if dialogue_round_count >= MAX_DIALOGUE_ROUNDS:
+            dialogue_ended = True
+            print(f"🏁 已达到 {MAX_DIALOGUE_ROUNDS} 轮对话上限，等待对方结束语...")
+            return
         
         await self.run_agent(
             context=msg,
@@ -101,9 +121,9 @@ if __name__ == "__main__":
         provider="qwen",
         api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
         api_key=os.getenv("DASHSCOPE_API_KEY"),
-        request_timeout=120,  # 增加超时时间，防止代理连接超时
+        request_timeout=120,  
         
-        react_to_all_messages=False,  # 只响应特定消息
+        react_to_all_messages=False,  
         
         instruction="""
 你是一个初入网文圈的新手作者。你读过上千本网文，眼高手低。你有一个绝佳的"赛博修仙"题材脑洞，但卡在了第三章半个月写不出来。你渴望成功（成神），但目前极其焦虑。
