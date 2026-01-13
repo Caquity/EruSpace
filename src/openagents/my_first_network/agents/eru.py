@@ -89,6 +89,7 @@ class AIAssistant(WorkerAgent):
                 if chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     accumulated_text += content
+
             
             # Send complete message once (frontend TypingText will handle typewriter effect)
             if accumulated_text:
