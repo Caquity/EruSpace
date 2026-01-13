@@ -214,3 +214,4 @@ node_modules/
 network_configuration.env
 src/openagents/my_first_network/agents/client.yaml
 src/openagents/my_first_network/agents/stuff.yaml
+src/openagents/my_first_network/*.md

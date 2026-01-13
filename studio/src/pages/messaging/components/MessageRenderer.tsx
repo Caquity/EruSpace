@@ -7,6 +7,7 @@
  * 3. Support attachment display
  * 4. Support thread structure display
  * 5. Support multiple rendering modes
+ * 6. Support typewriter effect for AI agent messages
  */
 
 import React, { useState, useRef } from "react";
@@ -30,6 +31,7 @@ import {
 import MarkdownContent from "./MarkdownContent";
 import { Button } from "@/components/layout/ui/button";
 import AttachmentDisplay from "./AttachmentDisplay";
+import { TypingText } from "@/components/ui/typing-text";
 
 // Supported message types
 type SupportedMessage = UnifiedMessage | ThreadMessage;
@@ -272,7 +274,20 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           {/* Message content */}
           <div className="message-content leading-6 break-words">
             {messageProps.content ? (
-              <MarkdownContent content={messageProps.content} />
+              // Check if this is an AI agent message (Eru) for typewriter effect
+              messageProps.senderId === "Eru" ? (
+                <div className="ai-message-typewriter">
+                  <TypingText 
+                    text={messageProps.content}
+                    speed={30}
+                    showCursor={false}
+                    startOnView={true}
+                    once={true}
+                  />
+                </div>
+              ) : (
+                <MarkdownContent content={messageProps.content} />
+              )
             ) : (
               <div className="text-gray-500 italic">Empty message</div>
             )}
@@ -426,7 +441,20 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           {/* Message content */}
           <div className="message-content leading-6 break-words">
             {message.content ? (
-              <MarkdownContent content={message.content} />
+              // Check if this is an AI agent message (Eru) for typewriter effect
+              message.senderId === "Eru" ? (
+                <div className="ai-message-typewriter">
+                  <TypingText 
+                    text={message.content}
+                    speed={30}
+                    showCursor={false}
+                    startOnView={true}
+                    once={true}
+                  />
+                </div>
+              ) : (
+                <MarkdownContent content={message.content} />
+              )
             ) : (
               <div className="text-gray-500 italic">Empty message</div>
             )}

@@ -5,6 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openagents.agents.worker_agent import WorkerAgent, EventContext, ChannelMessageContext
 from openagents.models.agent_config import AgentConfig
+from openai import AsyncOpenAI
 
 env_paths = [
     "src/openagents/my_first_network/network_configuration.env",
@@ -20,19 +21,32 @@ else:
     print("ℹ️  No .env file found, using system environment variables")
 
 # logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
  
 class AIAssistant(WorkerAgent):
-    """An AI-powered assistant agent"""
+    """An AI-powered assistant agent with streaming typewriter effect"""
     
     default_agent_id = "Eru"
     default_channels = ["#Home"]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Initialize OpenAI client for streaming
+        self.llm_client = None
 
     async def on_startup(self):
         """Register capabilities when starting"""
         await super().on_startup() 
+        
+        # Initialize LLM client
+        self.llm_client = AsyncOpenAI(
+            api_key=os.getenv("SILICONFLOW_API_KEY"),
+            base_url="https://api.siliconflow.cn/v1"
+        )
+        
         ws = self.workspace()
-        await ws.channel("Home").post(f"Hello!, I'm {self.default_agent_id}, your AI assistant. How can I help you today?")
+        await ws.channel("Home").post(f"Hello!, I'm {self.default_agent_id}, your AI assistant with typewriter effect! How can I help you today?")
         
     async def on_direct(self, msg: EventContext):
         """Handle direct messages with AI responses"""
@@ -40,14 +54,56 @@ class AIAssistant(WorkerAgent):
         await ws.agent(msg.source_id).send(f"Hello {msg.source_id}!")
     
     async def on_channel_post(self, msg: ChannelMessageContext):
-        """Monitor channel posts for help requests - ONLY in #Home channel"""
+        """Monitor channel posts and respond with streaming typewriter effect"""
         if msg.channel != "Home":
             return
         
-        await self.run_agent(
-            context=msg,
-            instruction="Reply to the message with a short response"
-        )
+        # Use streaming response
+        await self._stream_response(msg)
+    
+    async def _stream_response(self, msg: ChannelMessageContext):
+        """Generate response with streaming and send as single message for typewriter effect"""
+        try:
+            ws = self.workspace()
+            channel = ws.channel(msg.channel)
+            
+            # Get user message
+            user_message = msg.text
+            logger.info(f"Generating streaming response for: {user_message[:50]}...")
+            
+            # Call LLM with streaming to get response faster
+            stream = await self.llm_client.chat.completions.create(
+                model="zai-org/GLM-4.6V",
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant in an agent collaboration network. Keep responses concise and friendly."},
+                    {"role": "user", "content": user_message}
+                ],
+                stream=True,
+                max_tokens=500
+            )
+            
+            # Accumulate complete response
+            accumulated_text = ""
+            
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    accumulated_text += content
+            
+            # Send complete message once (frontend TypingText will handle typewriter effect)
+            if accumulated_text:
+                await channel.post(accumulated_text.strip())
+                logger.info(f"Sent complete response: {len(accumulated_text)} chars")
+            else:
+                logger.warning("No response generated from LLM")
+            
+        except Exception as e:
+            logger.error(f"Error in streaming response: {e}")
+            # Fallback to regular response
+            await self.run_agent(
+                context=msg,
+                instruction="Reply to the message with a short response"
+            )
 
 if __name__ == "__main__":
     agent_config = AgentConfig(
