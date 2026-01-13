@@ -55,6 +55,10 @@
   - Brave Search API - 辅助搜索
   - 新增 `HUGGINGFACE_API_KEY` 支持 ⭐️
   - 新增 `SILICONFLOW_API_KEY` 支持 ⭐️
+ 
+- **功能扩展**:
+  - [流式响应](#流式响应)
+
     
 - **部署方式**:
   - Docker 容器化
@@ -276,33 +280,6 @@ agent_config = AgentConfig(
 
 ### 可扩展性
 
-**水平扩展**:
-
-1. **添加新智能体**:
-   ```bash
-   # 复制模板
-   cp agents/eru.py agents/new_agent.py
-   # 修改配置
-   default_agent_id = "NewAgent"
-   default_channels = ["#NewChannel"]
-   ```
-
-2. **添加新频道**:
-   ```yaml
-   # network.yaml
-   default_channels:
-     - name: "TechSupport"
-       description: "Technical support channel"
-   ```
-
-3. **集成新工具**:
-   ```python
-   # tools/weather_api.py
-   class WeatherTool:
-       def get_weather(self, city):
-           # 调用外部 API
-   ```
-
 **垂直扩展**:
  **增强单个智能体能力**:
    - RAG (检索增强生成)
@@ -439,7 +416,55 @@ HUGGINGFACE_API_KEY
 
 ## 8. 挑战与解决方案
 
-### 1: 智能体间数据共享
+### 流式响应
+
+- OpenAgents目前不支持消息更新（没有`update_message` API），因此采用了**流式分块发送**的方案。
+
+**流式响应处理**：
+```python
+async def _stream_response(self, msg: ChannelMessageContext):
+    # 调用LLM流式API
+    stream = await self.llm_client.chat.completions.create(
+        model="zai-org/GLM-4.6V",
+        messages=[...],
+        stream=True,
+        max_tokens=500
+    )
+    
+    # 累积文本并定期发送
+    accumulated_text = ""
+    chunk_buffer = ""
+    chunk_size = 20  # 每20个字符发送一次
+    
+    async for chunk in stream:
+        if chunk.choices[0].delta.content:
+            content = chunk.choices[0].delta.content
+            chunk_buffer += content
+            accumulated_text += content
+            
+            # 达到阈值时发送块
+            if len(chunk_buffer) >= chunk_size:
+                await channel.post({
+                    "text": chunk_buffer,
+                    "is_streaming": True,
+                    "stream_id": msg.message_id
+                })
+                chunk_buffer = ""
+                await asyncio.sleep(0.1)  # 增加打字机效果的延迟
+```
+
+**优势**：
+- ✅ 真实的流式响应，用户可以实时看到AI思考过程
+- ✅ 可配置的块大小和延迟，调整打字速度
+- ✅ 支持错误处理和降级
+
+**前端实现**：
+- 使用现有的`TypingText`组件为特定发送者（Eru）的消息添加打字机效果。
+
+
+---
+
+### 2: 智能体间数据共享
 
 - ntfy_listener 是独立 Python 进程
 - news_assistant 是 OpenAgents WorkerAgent
@@ -469,7 +494,7 @@ news = NtfyNewsStorage.load_news()
 
 ---
 
-### 挑战 2: 防止消息重复发送
+### 3: 防止消息重复发送
 
 **问题描述**:
 - 用户多次 @mention 时不应重复发送相同新闻
