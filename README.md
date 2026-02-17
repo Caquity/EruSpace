@@ -3,10 +3,12 @@
 
 > 基于 OpenAgents 框架的多智能体协作网络系统
 ---
+<img src="src/openagents/my_first_network/img/Certificate.PNG" alt="Certificate" width="50%">
+<img src="src/openagents/my_first_network/img/Program_Detail.png" alt="Details" width="50%">
 
-![Certificate](src/openagents/my_first_network/img/Certificate.PNG)
-![Details](src/openagents/my_first_network/img/Program_Detail.png)
+
 [EruSpace - OpenAgents官网链接](https://openagents.org/zh/showcase/hackathon-2025/28)
+
 [演示视频](https://www.bilibili.com/video/BV1zSvCBrEFq/)
 
 ---
