@@ -1,8 +1,13 @@
-# EruSpace Agent Network 项目说明文档
 
 ![EruSpace](src/openagents/my_first_network/img/EruSpace.png)
 
 > 基于 OpenAgents 框架的多智能体协作网络系统
+---
+
+![Certificate](src/openagents/my_first_network/img/Certificate.PNG)
+![Details](src/openagents/my_first_network/img/Program_Detail.png)
+[EruSpace - OpenAgents官网链接](https://openagents.org/zh/showcase/hackathon-2025/28)
+[演示视频](https://www.bilibili.com/video/BV1zSvCBrEFq/)
 
 ---
 
